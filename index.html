@@ -112,7 +112,7 @@
     const postsContainerEl = document.getElementById('posts-container');
     const loadingMessageEl = document.getElementById('loading-message');
     const modalEl = document.getElementById('modal');
-    const modalMessageEl = document.getElementById('modal-message');
+    const modalMessageEl = document('modal-message');
     const modalOkBtn = document.getElementById('modal-ok-btn');
 
     // --- State variables ---
@@ -293,11 +293,7 @@
                         <span class="ml-1 text-base ${isDislikedByCurrentUser ? 'text-red-600' : 'text-gray-600'}">${post.dislikes}</span>
                     </button>
                     <button class="share-post-btn flex items-center text-blue-600 hover:text-blue-700 ripple-button" data-post-id="${post.id}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M15 8.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" />
-                            <path fill-rule="evenodd" d="M12.97 16.59a.75.75 0 011.06 0l2.25 2.25a.75.75 0 01-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06zM7.447 11.25a.75.75 0 011.06 0l2.25 2.25a.75.75 0 01-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06zM15 3.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5zM2.5 10a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" clip-rule="evenodd" />
-                            <path fill-rule="evenodd" d="M11.75 6.75a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5zM6.5 12.5a.75.75 0 000 1.5h7.5a.75.75 0 000-1.5H6.5z" clip-rule="evenodd" />
-                        </svg>
+                        <img src="https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/share.png" class="h-6 w-6" alt="Share">
                         <span class="ml-1 text-base">Share</span>
                     </button>
                 </div>
