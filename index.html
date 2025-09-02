@@ -88,7 +88,8 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
     import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
-
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
+    
     // User's provided Firebase configuration
     const firebaseConfig = {
         apiKey: "AIzaSyBpm4VrxpjKLrPXcjK-C9EflMrMAL8Atow",
@@ -99,7 +100,10 @@
         appId: "1:503228354185:web:118dc0a9656cdca9c80058",
         measurementId: "G-QW46D9VR04"
     };
+
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
     const auth = getAuth(app);
     const db = getFirestore(app);
     const APP_ID = firebaseConfig.projectId;
@@ -112,7 +116,7 @@
     const postsContainerEl = document.getElementById('posts-container');
     const loadingMessageEl = document.getElementById('loading-message');
     const modalEl = document.getElementById('modal');
-    const modalMessageEl = document('modal-message');
+    const modalMessageEl = document.getElementById('modal-message');
     const modalOkBtn = document.getElementById('modal-ok-btn');
 
     // --- State variables ---
