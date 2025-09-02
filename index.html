@@ -84,384 +84,408 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-        // User's provided Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBpm4VrxpjKLrPXcjK-C9EflMrMAL8Atow",
-            authDomain: "geminipost-f6d80.firebaseapp.com",
-            projectId: "geminipost-f6d80",
-            storageBucket: "geminipost-f6d80.firebasestorage.app",
-            messagingSenderId: "503228354185",
-            appId: "1:503228354185:web:118dc0a9656cdca9c80058",
-            measurementId: "G-QW46D9VR04"
-        };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const APP_ID = firebaseConfig.projectId;
+    // User's provided Firebase configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpm4VrxpjKLrPXcjK-C9EflMrMAL8Atow",
+        authDomain: "geminipost-f6d80.firebaseapp.com",
+        projectId: "geminipost-f6d80",
+        storageBucket: "geminipost-f6d80.firebasestorage.app",
+        messagingSenderId: "503228354185",
+        appId: "1:503228354185:web:118dc0a9656cdca9c80058",
+        measurementId: "G-QW46D9VR04"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const APP_ID = firebaseConfig.projectId;
 
-        // --- DOM Elements ---
-        const authUiEl = document.getElementById('auth-ui');
-        const postFormContainerEl = document.getElementById('post-form-container');
-        const postFormEl = document.getElementById('post-form');
-        const postContentInputEl = document.getElementById('post-content-input');
-        const postsContainerEl = document.getElementById('posts-container');
-        const loadingMessageEl = document.getElementById('loading-message');
-        const modalEl = document.getElementById('modal');
-        const modalMessageEl = document.getElementById('modal-message');
-        const modalOkBtn = document.getElementById('modal-ok-btn');
+    // --- DOM Elements ---
+    const authUiEl = document.getElementById('auth-ui');
+    const postFormContainerEl = document.getElementById('post-form-container');
+    const postFormEl = document.getElementById('post-form');
+    const postContentInputEl = document.getElementById('post-content-input');
+    const postsContainerEl = document.getElementById('posts-container');
+    const loadingMessageEl = document.getElementById('loading-message');
+    const modalEl = document.getElementById('modal');
+    const modalMessageEl = document.getElementById('modal-message');
+    const modalOkBtn = document.getElementById('modal-ok-btn');
 
-        // --- State variables ---
-        let user = null;
-        let posts = [];
-        let isAuthReady = false;
-        let sharedPostId = null;
+    // --- State variables ---
+    let user = null;
+    let posts = [];
+    let isAuthReady = false;
+    let sharedPostId = null;
 
-        // --- Utility Functions ---
-        const showModal = (message) => {
-            modalMessageEl.textContent = message;
-            modalEl.classList.remove('hidden');
-        };
+    // --- Utility Functions ---
+    const showModal = (message) => {
+        modalMessageEl.textContent = message;
+        modalEl.classList.remove('hidden');
+    };
 
-        const closeModal = () => {
-            modalEl.classList.add('hidden');
-        };
+    const closeModal = () => {
+        modalEl.classList.add('hidden');
+    };
 
-        const formatDate = (timestamp) => {
-            if (!timestamp) return 'Just now';
-            const date = timestamp.toDate();
-            return date.toLocaleString();
-        };
+    const formatDate = (timestamp) => {
+        if (!timestamp) return 'Just now';
+        const date = timestamp.toDate();
+        return date.toLocaleString();
+    };
 
-        const isUserBanned = async (userId) => {
-            if (!db) return false;
-            try {
-                const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
-                const userSnap = await getDoc(userRef);
-                return userSnap.exists() && userSnap.data().isBanned === true;
-            } catch (error) {
-                console.error("Error checking ban status:", error);
-                return false;
-            }
-        };
+    const isUserBanned = async (userId) => {
+        if (!db) return false;
+        try {
+            const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            const userSnap = await getDoc(userRef);
+            return userSnap.exists() && userSnap.data().isBanned === true;
+        } catch (error) {
+            console.error("Error checking ban status:", error);
+            return false;
+        }
+    };
 
-        const handleShareLink = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            sharedPostId = urlParams.get('shareid');
-            if (sharedPostId) {
-                postFormContainerEl.classList.add('hidden');
-            }
-        };
+    const handleShareLink = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        sharedPostId = urlParams.get('shareid');
+        if (sharedPostId) {
+            postFormContainerEl.classList.add('hidden');
+        }
+    };
 
-        const copyShareLink = (postId) => {
-            const shareUrl = `GeminiPost/?shareid=${postId}`;
-            navigator.clipboard.writeText(shareUrl)
-                .then(() => showModal('Share link copied to clipboard!'))
-                .catch(err => console.error('Failed to copy link: ', err));
-        };
+    const copyShareLink = (postId) => {
+        const baseUrl = window.location.href.split('?')[0];
+        const shareUrl = `${baseUrl}?shareid=${postId}`;
+        navigator.clipboard.writeText(shareUrl)
+            .then(() => showModal('Share link copied to clipboard!'))
+            .catch(err => console.error('Failed to copy link: ', err));
+    };
 
-        // --- UI Rendering ---
-        const renderUI = () => {
-            if (!sharedPostId) {
-                if (user) {
-                    authUiEl.innerHTML = `
-                        <span class="font-medium text-gray-700">Hello, ${user.displayName || 'User'}!</span>
-                        <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
-                    `;
-                    postFormContainerEl.classList.remove('hidden');
-                    document.getElementById('sign-out-btn').onclick = handleSignOut;
-                } else {
-                    authUiEl.innerHTML = `
-                        <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
-                    `;
-                    postFormContainerEl.classList.add('hidden');
-                    document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
-                }
+    // --- UI Rendering ---
+    const renderUI = () => {
+        if (!sharedPostId) {
+            if (user) {
+                authUiEl.innerHTML = `
+                    <span class="font-medium text-gray-700">Hello, ${user.displayName || 'User'}!</span>
+                    <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
+                `;
+                postFormContainerEl.classList.remove('hidden');
+                document.getElementById('sign-out-btn').onclick = handleSignOut;
             } else {
-                 authUiEl.innerHTML = ''; // Hide auth buttons on shared view
-                 postFormContainerEl.classList.add('hidden');
+                authUiEl.innerHTML = `
+                    <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
+                `;
+                postFormContainerEl.classList.add('hidden');
+                document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
             }
+        } else {
+             authUiEl.innerHTML = ''; // Hide auth buttons on shared view
+             postFormContainerEl.classList.add('hidden');
+        }
 
-            if (isAuthReady) {
-                loadingMessageEl.classList.add('hidden');
-                renderPosts();
-            }
-        };
+        if (isAuthReady) {
+            loadingMessageEl.classList.add('hidden');
+            renderPosts();
+        }
+    };
 
-        const renderPosts = () => {
-            postsContainerEl.innerHTML = '';
-            if (posts.length === 0) {
-                postsContainerEl.innerHTML = `<p class="text-center text-gray-500 mt-10">No posts yet. Be the first to post!</p>`;
-                return;
-            }
+    const renderPosts = () => {
+        postsContainerEl.innerHTML = '';
+        if (posts.length === 0) {
+            postsContainerEl.innerHTML = `<p class="text-center text-gray-500 mt-10">No posts yet. Be the first to post!</p>`;
+            return;
+        }
 
-            posts.forEach(post => {
-                const postEl = document.createElement('div');
-                postEl.className = 'bg-white p-6 rounded-xl shadow-lg mb-6';
-                postEl.setAttribute('data-post-id', post.id);
+        posts.forEach(post => {
+            const postEl = document.createElement('div');
+            postEl.className = 'bg-white p-6 rounded-xl shadow-lg mb-6';
+            postEl.setAttribute('data-post-id', post.id);
 
-                const renderComments = (commentList) => {
-                    return commentList.map(comment => `
-                        <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
-                            <div class="flex justify-between items-start">
-                                <div class="flex-1">
-                                    <p class="font-semibold text-gray-800">${comment.authorName}</p>
-                                    <p class="text-sm text-gray-500">${formatDate(comment.createdAt)}</p>
-                                    <p class="mt-2 text-gray-700">${comment.content}</p>
-                                </div>
-                                ${user && comment.userId === user.uid ? `
-                                    <button class="delete-comment-btn text-red-500 hover:text-red-700 ml-2" data-comment-id="${comment.id}" data-post-id="${post.id}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                        </svg>
-                                    </button>
-                                ` : ''}
+            const renderComments = (commentList) => {
+                return commentList.map(comment => `
+                    <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800">${comment.authorName}</p>
+                                <p class="text-sm text-gray-500">${formatDate(comment.createdAt)}</p>
+                                <p class="mt-2 text-gray-700">${comment.content}</p>
                             </div>
-                            <div class="flex items-center space-x-4 mt-2">
-                                <button class="like-comment-btn flex items-center text-green-600 hover:text-green-700 ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
+                            ${user && comment.userId === user.uid ? `
+                                <button class="delete-comment-btn text-red-500 hover:text-red-700 ml-2" data-comment-id="${comment.id}" data-post-id="${post.id}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(45 10 10.5)" />
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                                     </svg>
-                                    <span class="ml-1">${comment.likes}</span>
                                 </button>
-                                <button class="dislike-comment-btn flex items-center text-red-600 hover:text-red-700 ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(-45 10 10.5)" />
-                                    </svg>
-                                    <span class="ml-1">${comment.dislikes}</span>
-                                </button>
-                            </div>
-                            ${user ? `
-                                <form class="comment-reply-form mt-2 flex" data-post-id="${post.id}" data-parent-comment-id="${comment.id}">
-                                    <input type="text" name="comment" class="flex-1 p-2 text-sm border rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Reply...">
-                                    <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600">Reply</button>
-                                </form>
                             ` : ''}
-                            <div class="pl-6 mt-4 border-l-2 border-gray-300 space-y-4">
-                                ${comment.replies && comment.replies.length > 0 ? renderComments(comment.replies) : ''}
-                            </div>
                         </div>
-                    `).join('');
-                };
-
-                const postHtml = `
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="flex-1">
-                            <h2 class="text-lg font-bold text-gray-800">${post.authorName}</h2>
-                            <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
-                            <p class="mt-2 text-gray-700">${post.content}</p>
-                        </div>
-                        ${user && post.userId === user.uid ? `
-                            <button class="delete-post-btn text-red-500 hover:text-red-700 ml-4" data-post-id="${post.id}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        <div class="flex items-center space-x-4 mt-2">
+                            <button class="like-comment-btn flex items-center text-green-600 hover:text-green-700 ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(45 10 10.5)" />
                                 </svg>
+                                <span class="ml-1">${comment.likes}</span>
                             </button>
-                        ` : ''}
-                    </div>
-                    <div class="flex items-center space-x-6">
-                        <button class="like-post-btn flex items-center text-green-600 hover:text-green-700 ripple-button" data-post-id="${post.id}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(45 10 10.5)" />
-                            </svg>
-                            <span class="ml-1 text-base">${post.likes}</span>
-                        </button>
-                        <button class="dislike-post-btn flex items-center text-red-600 hover:text-red-700 ripple-button" data-post-id="${post.id}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(-45 10 10.5)" />
-                            </svg>
-                            <span class="ml-1 text-base">${post.dislikes}</span>
-                        </button>
-                        <button class="share-post-btn flex items-center text-blue-600 hover:text-blue-700 ripple-button" data-post-id="${post.id}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M15 8.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" />
-                                <path fill-rule="evenodd" d="M12.97 16.59a.75.75 0 011.06 0l2.25 2.25a.75.75 0 01-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06zM7.447 11.25a.75.75 0 011.06 0l2.25 2.25a.75.75 0 01-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06zM15 3.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5zM2.5 10a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" clip-rule="evenodd" />
-                                <path fill-rule="evenodd" d="M11.75 6.75a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5zM6.5 12.5a.75.75 0 000 1.5h7.5a.75.75 0 000-1.5H6.5z" clip-rule="evenodd" />
-                            </svg>
-                            <span class="ml-1 text-base">Share</span>
-                        </button>
-                    </div>
-                    <div class="mt-4">
-                        <h3 class="text-lg font-semibold text-gray-800">Comments</h3>
-                        ${user && !sharedPostId ? `
-                            <form class="comment-form mt-2 flex" data-post-id="${post.id}">
-                                <input type="text" name="comment" class="flex-1 p-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Add a comment...">
-                                <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Comment</button>
+                            <button class="dislike-comment-btn flex items-center text-red-600 hover:text-red-700 ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(-45 10 10.5)" />
+                                </svg>
+                                <span class="ml-1">${comment.dislikes}</span>
+                            </button>
+                        </div>
+                        ${user ? `
+                            <form class="comment-reply-form mt-2 flex" data-post-id="${post.id}" data-parent-comment-id="${comment.id}">
+                                <input type="text" name="comment" class="flex-1 p-2 text-sm border rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Reply...">
+                                <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600">Reply</button>
                             </form>
                         ` : ''}
-                        <div class="comments-list mt-4 space-y-4">
-                            ${renderComments(post.comments)}
+                        <div class="pl-6 mt-4 border-l-2 border-gray-300 space-y-4">
+                            ${comment.replies && comment.replies.length > 0 ? renderComments(comment.replies) : ''}
                         </div>
                     </div>
-                `;
-                postEl.innerHTML = postHtml;
-                postsContainerEl.appendChild(postEl);
-            });
-        };
+                `).join('');
+            };
 
-        // --- Auth Handlers ---
-        const handleGoogleSignIn = async () => {
-            try {
-                const provider = new GoogleAuthProvider();
-                const result = await signInWithPopup(auth, provider);
-                const currentUser = result.user;
+            const postHtml = `
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <h2 class="text-lg font-bold text-gray-800">${post.authorName}</h2>
+                        <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
+                        <p class="mt-2 text-gray-700">${post.content}</p>
+                    </div>
+                    ${user && post.userId === user.uid ? `
+                        <button class="delete-post-btn text-red-500 hover:text-red-700 ml-4" data-post-id="${post.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="flex items-center space-x-6">
+                    <button class="like-post-btn flex items-center text-green-600 hover:text-green-700 ripple-button" data-post-id="${post.id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(45 10 10.5)" />
+                        </svg>
+                        <span class="ml-1 text-base">${post.likes}</span>
+                    </button>
+                    <button class="dislike-post-btn flex items-center text-red-600 hover:text-red-700 ripple-button" data-post-id="${post.id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(-45 10 10.5)" />
+                        </svg>
+                        <span class="ml-1 text-base">${post.dislikes}</span>
+                    </button>
+                    <button class="share-post-btn flex items-center text-blue-600 hover:text-blue-700 ripple-button" data-post-id="${post.id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M15 8.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" />
+                            <path fill-rule="evenodd" d="M12.97 16.59a.75.75 0 011.06 0l2.25 2.25a.75.75 0 01-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06zM7.447 11.25a.75.75 0 011.06 0l2.25 2.25a.75.75 0 01-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06zM15 3.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5zM2.5 10a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" clip-rule="evenodd" />
+                            <path fill-rule="evenodd" d="M11.75 6.75a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5zM6.5 12.5a.75.75 0 000 1.5h7.5a.75.75 0 000-1.5H6.5z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="ml-1 text-base">Share</span>
+                    </button>
+                </div>
+                <div class="mt-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Comments</h3>
+                    ${user && !sharedPostId ? `
+                        <form class="comment-form mt-2 flex" data-post-id="${post.id}">
+                            <input type="text" name="comment" class="flex-1 p-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Add a comment...">
+                            <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Comment</button>
+                        </form>
+                    ` : ''}
+                    <div class="comments-list mt-4 space-y-4">
+                        ${renderComments(post.comments)}
+                    </div>
+                </div>
+            `;
+            postEl.innerHTML = postHtml;
+            postsContainerEl.appendChild(postEl);
+        });
+    };
 
-                const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
-                const userSnap = await getDoc(userRef);
+    // --- Auth Handlers ---
+    const handleGoogleSignIn = async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            const currentUser = result.user;
 
-                if (!userSnap.exists()) {
-                    await setDoc(userRef, {
-                        uid: currentUser.uid,
-                        displayName: currentUser.displayName,
-                        isBanned: false,
-                        createdAt: new Date(),
-                    });
-                }
-            } catch (error) {
-                console.error("Google Sign-In Error:", error);
-                showModal('Failed to sign in with Google. Check the console for details.');
+            const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+            const userSnap = await getDoc(userRef);
+
+            if (!userSnap.exists()) {
+                await setDoc(userRef, {
+                    uid: currentUser.uid,
+                    displayName: currentUser.displayName,
+                    isBanned: false,
+                    createdAt: new Date(),
+                });
             }
-        };
+        } catch (error) {
+            console.error("Google Sign-In Error:", error);
+            showModal('Failed to sign in with Google. Check the console for details.');
+        }
+    };
 
-        const handleSignOut = async () => {
-            await signOut(auth);
-            user = null;
-            renderUI();
-            showModal('You have been signed out.');
-        };
+    const handleSignOut = async () => {
+        await signOut(auth);
+        user = null;
+        renderUI();
+        showModal('You have been signed out.');
+    };
 
-        // --- Post & Comment Handlers ---
-        const handlePostSubmit = async (e) => {
-            e.preventDefault();
-            if (!user || !postContentInputEl.value.trim()) {
-                showModal('Please write something to post.');
-                return;
-            }
-            const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
-            await addDoc(postsRef, {
-                userId: user.uid,
-                authorName: user.displayName || 'Anonymous',
-                content: postContentInputEl.value.trim(),
-                createdAt: new Date(),
-                likes: 0,
-                dislikes: 0,
-                likers: [],
-                dislikers: [],
-            });
-            postContentInputEl.value = '';
-        };
+    // --- Post & Comment Handlers ---
+    const handlePostSubmit = async (e) => {
+        e.preventDefault();
+        if (!user || !postContentInputEl.value.trim()) {
+            showModal('Please write something to post.');
+            return;
+        }
+        const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+        await addDoc(postsRef, {
+            userId: user.uid,
+            authorName: user.displayName || 'Anonymous',
+            content: postContentInputEl.value.trim(),
+            createdAt: new Date(),
+            likes: 0,
+            dislikes: 0,
+            likers: [],
+            dislikers: [],
+        });
+        postContentInputEl.value = '';
+    };
 
-        const handlePostDelete = async (postId) => {
-            if (!user) return;
-            const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
-            await deleteDoc(postRef);
-        };
+    const handlePostDelete = async (postId) => {
+        if (!user) return;
+        const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+        await deleteDoc(postRef);
+    };
 
-        const handleCommentSubmit = async (e) => {
-            e.preventDefault();
-            if (!user) return;
+    const handleCommentSubmit = async (e) => {
+        e.preventDefault();
+        if (!user) return;
 
-            const postId = e.target.getAttribute('data-post-id');
-            const parentCommentId = e.target.getAttribute('data-parent-comment-id');
-            const content = e.target.querySelector('input[name="comment"]').value;
+        const postId = e.target.getAttribute('data-post-id');
+        const parentCommentId = e.target.getAttribute('data-parent-comment-id');
+        const content = e.target.querySelector('input[name="comment"]').value;
 
-            if (!content.trim()) return;
+        if (!content.trim()) return;
 
-            const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`);
-            await addDoc(commentsRef, {
-                userId: user.uid,
-                authorName: user.displayName || 'Anonymous',
-                content,
-                createdAt: new Date(),
-                likes: 0,
-                dislikes: 0,
-                likers: [],
-                dislikers: [],
-                parentCommentId,
-            });
-            e.target.reset();
-        };
+        const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`);
+        await addDoc(commentsRef, {
+            userId: user.uid,
+            authorName: user.displayName || 'Anonymous',
+            content,
+            createdAt: new Date(),
+            likes: 0,
+            dislikes: 0,
+            likers: [],
+            dislikers: [],
+            parentCommentId,
+        });
+        e.target.reset();
+    };
 
-        const handleCommentDelete = async (postId, commentId) => {
-            if (!user) return;
-            const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
-            await deleteDoc(commentRef);
-        };
+    const handleCommentDelete = async (postId, commentId) => {
+        if (!user) return;
+        const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
+        await deleteDoc(commentRef);
+    };
 
-        // --- Like/Dislike Handlers ---
-        const handleVote = async (target, targetId, voteType, postId = null) => {
-            if (!user) {
-                showModal('You must be signed in to like or dislike.');
-                return;
-            }
+    // --- Like/Dislike Handlers ---
+    const handleVote = async (target, targetId, voteType, postId = null) => {
+        if (!user) {
+            showModal('You must be signed in to like or dislike.');
+            return;
+        }
 
-            const ref = target === 'post'
-                ? doc(db, `/artifacts/${APP_ID}/public/data/posts`, targetId)
-                : doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, targetId);
+        const ref = target === 'post'
+            ? doc(db, `/artifacts/${APP_ID}/public/data/posts`, targetId)
+            : doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, targetId);
 
-            const docSnapshot = await getDoc(ref);
+        const docSnapshot = await getDoc(ref);
 
-            if (!docSnapshot.exists()) {
-                showModal('Error: Document not found.');
-                return;
-            }
+        if (!docSnapshot.exists()) {
+            showModal('Error: Document not found.');
+            return;
+        }
 
-            const data = docSnapshot.data();
-            let likers = data.likers || [];
-            let dislikers = data.dislikers || [];
-            let likesCount = data.likes;
-            let dislikesCount = data.dislikes;
+        const data = docSnapshot.data();
+        let likers = data.likers || [];
+        let dislikers = data.dislikers || [];
+        let likesCount = data.likes;
+        let dislikesCount = data.dislikes;
 
-            const userId = user.uid;
-            const hasLiked = likers.includes(userId);
-            const hasDisliked = dislikers.includes(userId);
+        const userId = user.uid;
+        const hasLiked = likers.includes(userId);
+        const hasDisliked = dislikers.includes(userId);
 
-            if (voteType === 'like') {
-                if (hasLiked) {
-                    likers = likers.filter(id => id !== userId);
-                    likesCount--;
-                } else {
-                    likers = [...likers, userId];
-                    likesCount++;
-                    if (hasDisliked) {
-                        dislikers = dislikers.filter(id => id !== userId);
-                        dislikesCount--;
-                    }
-                }
-            } else { // voteType === 'dislike'
+        if (voteType === 'like') {
+            if (hasLiked) {
+                likers = likers.filter(id => id !== userId);
+                likesCount--;
+            } else {
+                likers = [...likers, userId];
+                likesCount++;
                 if (hasDisliked) {
                     dislikers = dislikers.filter(id => id !== userId);
                     dislikesCount--;
-                } else {
-                    dislikers = [...dislikers, userId];
-                    dislikesCount++;
-                    if (hasLiked) {
-                        likers = likers.filter(id => id !== userId);
-                        likesCount--;
-                    }
                 }
             }
-            await updateDoc(ref, {
-                likes: likesCount,
-                dislikes: dislikesCount,
-                likers: likers,
-                dislikers: dislikers,
-            });
-        };
+        } else { // voteType === 'dislike'
+            if (hasDisliked) {
+                dislikers = dislikers.filter(id => id !== userId);
+                dislikesCount--;
+            } else {
+                dislikers = [...dislikers, userId];
+                dislikesCount++;
+                if (hasLiked) {
+                    likers = likers.filter(id => id !== userId);
+                    likesCount--;
+                }
+            }
+        }
+        await updateDoc(ref, {
+            likes: likesCount,
+            dislikes: dislikesCount,
+            likers: likers,
+            dislikers: dislikers,
+        });
+    };
 
-        // --- Firestore Listeners with Share Logic ---
-        const setupFirestoreListeners = () => {
-            if (sharedPostId) {
-                const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, sharedPostId);
-                onSnapshot(postRef, async (postSnapshot) => {
-                    if (postSnapshot.exists()) {
-                        const postData = { id: postSnapshot.id, ...postSnapshot.data(), comments: [] };
-                        const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postData.id}/comments`);
-                        const commentSnapshot = await getDocs(commentsRef);
+    // --- Firestore Listeners with Share Logic ---
+    const setupFirestoreListeners = () => {
+        if (sharedPostId) {
+            const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, sharedPostId);
+            onSnapshot(postRef, async (postSnapshot) => {
+                if (postSnapshot.exists()) {
+                    const postData = { id: postSnapshot.id, ...postSnapshot.data(), comments: [] };
+                    const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postData.id}/comments`);
+                    const commentSnapshot = await getDocs(commentsRef);
+                    const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
+
+                    const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                    sortedComments.forEach(comment => {
+                        comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                    });
+
+                    postData.comments = sortedComments;
+                    posts = [postData];
+                    renderPosts();
+                } else {
+                    postsContainerEl.innerHTML = `<p class="text-center text-red-500 mt-10">Post not found.</p>`;
+                }
+            });
+        } else {
+            const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            onSnapshot(query(postsRef), (snapshot) => {
+                posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), comments: [] }));
+                posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+
+                posts.forEach(post => {
+                    const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
+                    onSnapshot(commentsRef, (commentSnapshot) => {
                         const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
 
                         const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
@@ -469,102 +493,79 @@
                             comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
                         });
 
-                        postData.comments = sortedComments;
-                        posts = [postData];
-                        renderPosts();
-                    } else {
-                        postsContainerEl.innerHTML = `<p class="text-center text-red-500 mt-10">Post not found.</p>`;
-                    }
-                });
-            } else {
-                const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
-                onSnapshot(query(postsRef), (snapshot) => {
-                    posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), comments: [] }));
-                    posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
-
-                    posts.forEach(post => {
-                        const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
-                        onSnapshot(commentsRef, (commentSnapshot) => {
-                            const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
-
-                            const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                            sortedComments.forEach(comment => {
-                                comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                            });
-
-                            const postIndex = posts.findIndex(p => p.id === post.id);
-                            if (postIndex !== -1) {
-                                posts[postIndex].comments = sortedComments;
-                            }
-                            renderPosts();
-                        });
-                    });
-                    renderPosts();
-                });
-            }
-        };
-
-        // --- Event Listeners and Initial Setup ---
-        window.onload = () => {
-            handleShareLink();
-            modalOkBtn.onclick = closeModal;
-            postFormEl.onsubmit = handlePostSubmit;
-
-            postsContainerEl.addEventListener('click', (e) => {
-                const target = e.target.closest('button');
-                if (!target) return;
-
-                const postId = target.getAttribute('data-post-id');
-                const commentId = target.getAttribute('data-comment-id');
-
-                if (target.classList.contains('delete-post-btn')) {
-                    handlePostDelete(postId);
-                } else if (target.classList.contains('delete-comment-btn')) {
-                    handleCommentDelete(postId, commentId);
-                } else if (target.classList.contains('like-post-btn')) {
-                    handleVote('post', postId, 'like');
-                } else if (target.classList.contains('dislike-post-btn')) {
-                    handleVote('post', postId, 'dislike');
-                } else if (target.classList.contains('like-comment-btn')) {
-                    handleVote('comment', commentId, 'like', postId);
-                } else if (target.classList.contains('dislike-comment-btn')) {
-                    handleVote('comment', commentId, 'dislike', postId);
-                } else if (target.classList.contains('share-post-btn')) {
-                    copyShareLink(postId);
-                }
-            });
-
-            postsContainerEl.addEventListener('submit', (e) => {
-                const form = e.target.closest('form');
-                if ((form && form.classList.contains('comment-form')) || form.classList.contains('comment-reply-form')) {
-                    handleCommentSubmit(e);
-                }
-            });
-
-            onAuthStateChanged(auth, async (currentUser) => {
-                if (currentUser) {
-                    const isBanned = await isUserBanned(currentUser.uid);
-                    if (isBanned) {
-                        await signOut(auth);
-                        showModal('Your account has been banned. You have been signed out.');
-                        user = null;
-                    } else {
-                        const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
-                        const userSnap = await getDoc(userDocRef);
-                        if (userSnap.exists()) {
-                            user = { ...currentUser, displayName: userSnap.data().displayName };
-                        } else {
-                             user = currentUser;
+                        const postIndex = posts.findIndex(p => p.id === post.id);
+                        if (postIndex !== -1) {
+                            posts[postIndex].comments = sortedComments;
                         }
-                    }
-                } else {
-                    user = null;
-                }
-                isAuthReady = true;
-                renderUI();
-                setupFirestoreListeners();
+                        renderPosts();
+                    });
+                });
+                renderPosts();
             });
-        };
-    </script>
+        }
+    };
+
+    // --- Event Listeners and Initial Setup ---
+    window.onload = () => {
+        handleShareLink();
+        modalOkBtn.onclick = closeModal;
+        postFormEl.onsubmit = handlePostSubmit;
+
+        postsContainerEl.addEventListener('click', (e) => {
+            const target = e.target.closest('button');
+            if (!target) return;
+
+            const postId = target.getAttribute('data-post-id');
+            const commentId = target.getAttribute('data-comment-id');
+
+            if (target.classList.contains('delete-post-btn')) {
+                handlePostDelete(postId);
+            } else if (target.classList.contains('delete-comment-btn')) {
+                handleCommentDelete(postId, commentId);
+            } else if (target.classList.contains('like-post-btn')) {
+                handleVote('post', postId, 'like');
+            } else if (target.classList.contains('dislike-post-btn')) {
+                handleVote('post', postId, 'dislike');
+            } else if (target.classList.contains('like-comment-btn')) {
+                handleVote('comment', commentId, 'like', postId);
+            } else if (target.classList.contains('dislike-comment-btn')) {
+                handleVote('comment', commentId, 'dislike', postId);
+            } else if (target.classList.contains('share-post-btn')) {
+                copyShareLink(postId);
+            }
+        });
+
+        postsContainerEl.addEventListener('submit', (e) => {
+            const form = e.target.closest('form');
+            if ((form && form.classList.contains('comment-form')) || form.classList.contains('comment-reply-form')) {
+                handleCommentSubmit(e);
+            }
+        });
+
+        onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                const isBanned = await isUserBanned(currentUser.uid);
+                if (isBanned) {
+                    await signOut(auth);
+                    showModal('Your account has been banned. You have been signed out.');
+                    user = null;
+                } else {
+                    const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+                    const userSnap = await getDoc(userDocRef);
+                    if (userSnap.exists()) {
+                        user = { ...currentUser, displayName: userSnap.data().displayName };
+                    } else {
+                         user = currentUser;
+                    }
+                }
+            } else {
+                user = null;
+            }
+            isAuthReady = true;
+            renderUI();
+            setupFirestoreListeners();
+        });
+    };
+</script>
 </body>
 </html>
