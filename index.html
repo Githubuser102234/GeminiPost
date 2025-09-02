@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Gemini Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .ripple-button {
+            position: relative;
+            overflow: hidden;
+            transform: translate3d(0, 0, 0);
+        }
+
+        .ripple-button:after {
+            content: '';
+            display: block;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+            background-repeat: no-repeat;
+            background-position: 50%;
+            transform: scale(10, 10);
+            opacity: 0;
+            transition: transform .5s, opacity 1s;
+        }
+
+        .ripple-button:active:after {
+            transform: scale(0, 0);
+            opacity: 0.3;
+            transition: 0s;
+        }
+
+        .comment-container {
+            display: none;
+        }
+        .comment-container.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+
+    <!-- Header and Auth Section -->
+    <div class="w-full max-w-2xl bg-white p-6 rounded-xl shadow-lg mb-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">The Gemini Platform</h1>
+        <div id="auth-ui" class="flex items-center space-x-4">
+            <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div id="main-content" class="w-full max-w-2xl">
+        <div id="post-form-container" class="hidden">
+            <!-- Post Creation Form -->
+            <form id="post-form" class="bg-white p-6 rounded-xl shadow-lg mb-6 w-full mx-auto">
+                <h2 class="text-xl font-bold mb-4 text-gray-800">Create a Post</h2>
+                <textarea id="post-content-input" class="w-full p-4 border rounded-xl bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" rows="4" placeholder="What's on your mind?"></textarea>
+                <button type="submit" class="ripple-button w-full mt-4 bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Post</button>
+            </form>
+        </div>
+
+        <div id="posts-container" class="space-y-6">
+            <p id="loading-message" class="text-center text-gray-500 mt-10">Loading posts...</p>
+        </div>
+    </div>
+
+    <!-- Modal for Alerts -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+            <p id="modal-message" class="text-center text-lg font-semibold mb-4 text-gray-800"></p>
+            <div class="flex justify-center">
+                <button id="modal-ok-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-200 ripple-button">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+        // User's provided Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBpm4VrxpjKLrPXcjK-C9EflMrMAL8Atow",
+            authDomain: "geminipost-f6d80.firebaseapp.com",
+            projectId: "geminipost-f6d80",
+            storageBucket: "geminipost-f6d80.firebasestorage.app",
+            messagingSenderId: "503228354185",
+            appId: "1:503228354185:web:118dc0a9656cdca9c80058",
+            measurementId: "G-QW46D9VR04"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const APP_ID = firebaseConfig.projectId; // Use project ID as unique app ID
+
+        // --- DOM Elements ---
+        const authUiEl = document.getElementById('auth-ui');
+        const postFormContainerEl = document.getElementById('post-form-container');
+        const postFormEl = document.getElementById('post-form');
+        const postContentInputEl = document.getElementById('post-content-input');
+        const postsContainerEl = document.getElementById('posts-container');
+        const loadingMessageEl = document.getElementById('loading-message');
+        const modalEl = document.getElementById('modal');
+        const modalMessageEl = document.getElementById('modal-message');
+        const modalOkBtn = document.getElementById('modal-ok-btn');
+
+        // --- State variables ---
+        let user = null;
+        let posts = [];
+        let isAuthReady = false;
+
+        // --- Utility Functions ---
+        const showModal = (message) => {
+            modalMessageEl.textContent = message;
+            modalEl.classList.remove('hidden');
+        };
+
+        const closeModal = () => {
+            modalEl.classList.add('hidden');
+        };
+
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'Just now';
+            const date = timestamp.toDate();
+            return date.toLocaleString();
+        };
+
+        const isUserBanned = async (userId) => {
+            if (!db) return false;
+            try {
+                const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+                const userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                    return userSnap.data().isBanned === true;
+                }
+                return false;
+            } catch (error) {
+                console.error("Error checking ban status:", error);
+                return false;
+            }
+        };
+
+        // --- UI Rendering ---
+        const renderUI = () => {
+            if (user) {
+                authUiEl.innerHTML = `
+                    <span class="font-medium text-gray-700">Hello, ${user.displayName || 'User'}!</span>
+                    <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
+                `;
+                postFormContainerEl.classList.remove('hidden');
+                document.getElementById('sign-out-btn').onclick = handleSignOut;
+            } else {
+                authUiEl.innerHTML = `
+                    <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
+                `;
+                postFormContainerEl.classList.add('hidden');
+                document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
+            }
+            if (isAuthReady) {
+                loadingMessageEl.classList.add('hidden');
+                renderPosts();
+            }
+        };
+
+        const renderPosts = () => {
+            postsContainerEl.innerHTML = '';
+            if (posts.length === 0) {
+                postsContainerEl.innerHTML = `<p class="text-center text-gray-500 mt-10">No posts yet. Be the first to post!</p>`;
+                return;
+            }
+
+            posts.forEach(post => {
+                const postEl = document.createElement('div');
+                postEl.className = 'bg-white p-6 rounded-xl shadow-lg mb-6';
+                postEl.setAttribute('data-post-id', post.id);
+
+                const renderComments = (commentList) => {
+                    return commentList.map(comment => `
+                        <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <p class="font-semibold text-gray-800">${comment.authorName}</p>
+                                    <p class="text-sm text-gray-500">${formatDate(comment.createdAt)}</p>
+                                    <p class="mt-2 text-gray-700">${comment.content}</p>
+                                </div>
+                                ${user && comment.userId === user.uid ? `
+                                    <button class="delete-comment-btn text-red-500 hover:text-red-700 ml-2" data-comment-id="${comment.id}" data-post-id="${post.id}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                ` : ''}
+                            </div>
+                            <div class="flex items-center space-x-4 mt-2">
+                                <button class="like-comment-btn flex items-center text-green-600 hover:text-green-700 ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(45 10 10.5)" />
+                                    </svg>
+                                    <span class="ml-1">${comment.likes}</span>
+                                </button>
+                                <button class="dislike-comment-btn flex items-center text-red-600 hover:text-red-700 ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(-45 10 10.5)" />
+                                    </svg>
+                                    <span class="ml-1">${comment.dislikes}</span>
+                                </button>
+                            </div>
+                            <div class="pl-6 mt-4 border-l-2 border-gray-300 space-y-4">
+                                ${comment.replies.length > 0 ? renderComments(comment.replies) : ''}
+                            </div>
+                            <form class="comment-reply-form mt-2 flex" data-post-id="${post.id}" data-parent-comment-id="${comment.id}">
+                                <input type="text" name="comment" class="flex-1 p-2 text-sm border rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Reply...">
+                                <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600">Reply</button>
+                            </form>
+                        </div>
+                    `).join('');
+                };
+
+                const postHtml = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex-1">
+                            <h2 class="text-lg font-bold text-gray-800">${post.authorName}</h2>
+                            <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
+                            <p class="mt-2 text-gray-700">${post.content}</p>
+                        </div>
+                        ${user && post.userId === user.uid ? `
+                            <button class="delete-post-btn text-red-500 hover:text-red-700 ml-4" data-post-id="${post.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="flex items-center space-x-6">
+                        <button class="like-post-btn flex items-center text-green-600 hover:text-green-700 ripple-button" data-post-id="${post.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(45 10 10.5)" />
+                            </svg>
+                            <span class="ml-1 text-base">${post.likes}</span>
+                        </button>
+                        <button class="dislike-post-btn flex items-center text-red-600 hover:text-red-700 ripple-button" data-post-id="${post.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 10.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zM10 16a.5.5 0 01-.5-.5v-10a.5.5 0 011 0v10a.5.5 0 01-.5.5z" transform="rotate(-45 10 10.5)" />
+                            </svg>
+                            <span class="ml-1 text-base">${post.dislikes}</span>
+                        </button>
+                    </div>
+                    <div class="mt-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Comments</h3>
+                        <form class="comment-form mt-2 flex" data-post-id="${post.id}">
+                            <input type="text" name="comment" class="flex-1 p-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Add a comment...">
+                            <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Comment</button>
+                        </form>
+                        <div class="comments-list mt-4 space-y-4">
+                            ${renderComments(post.comments)}
+                        </div>
+                    </div>
+                `;
+                postEl.innerHTML = postHtml;
+                postsContainerEl.appendChild(postEl);
+            });
+        };
+
+        // --- Auth Handlers ---
+        const handleGoogleSignIn = async () => {
+            try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(auth, provider);
+                const currentUser = result.user;
+
+                const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+                const userSnap = await getDocs(query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where('uid', '==', currentUser.uid)));
+                
+                if (userSnap.empty) {
+                    await setDoc(userRef, {
+                        uid: currentUser.uid,
+                        displayName: currentUser.displayName,
+                        isBanned: false,
+                        createdAt: new Date(),
+                    });
+                }
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                showModal('Failed to sign in with Google. Check the console for details.');
+            }
+        };
+
+        const handleSignOut = async () => {
+            await signOut(auth);
+            user = null;
+            renderUI();
+            showModal('You have been signed out.');
+        };
+
+        // --- Post & Comment Handlers ---
+        const handlePostSubmit = async (e) => {
+            e.preventDefault();
+            if (!user || !postContentInputEl.value.trim()) {
+                showModal('Please write something to post.');
+                return;
+            }
+            const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            await addDoc(postsRef, {
+                userId: user.uid,
+                authorName: user.displayName || 'Anonymous',
+                content: postContentInputEl.value.trim(),
+                createdAt: new Date(),
+                likes: 0,
+                dislikes: 0,
+                likers: [],
+                dislikers: [],
+            });
+            postContentInputEl.value = '';
+        };
+
+        const handlePostDelete = async (postId) => {
+            if (!user) return;
+            const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            await deleteDoc(postRef);
+        };
+
+        const handleCommentSubmit = async (e) => {
+            e.preventDefault();
+            if (!user) return;
+
+            const postId = e.target.getAttribute('data-post-id');
+            const parentCommentId = e.target.getAttribute('data-parent-comment-id');
+            const content = e.target.querySelector('input[name="comment"]').value;
+
+            if (!content.trim()) return;
+
+            const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`);
+            await addDoc(commentsRef, {
+                userId: user.uid,
+                authorName: user.displayName || 'Anonymous',
+                content,
+                createdAt: new Date(),
+                likes: 0,
+                dislikes: 0,
+                likers: [],
+                dislikers: [],
+                parentCommentId,
+            });
+            e.target.reset();
+        };
+
+        const handleCommentDelete = async (postId, commentId) => {
+            if (!user) return;
+            const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
+            await deleteDoc(commentRef);
+        };
+
+        // --- Like/Dislike Handlers ---
+        const handleVote = async (target, targetId, voteType, postId = null) => {
+            if (!user) {
+                showModal('You must be signed in to like or dislike.');
+                return;
+            }
+
+            const ref = target === 'post'
+                ? doc(db, `/artifacts/${APP_ID}/public/data/posts`, targetId)
+                : doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, targetId);
+
+            const docSnapshot = await getDocs(query(collection(db, target === 'post' ? `/artifacts/${APP_ID}/public/data/posts` : `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`), where('__name__', '==', targetId)));
+
+            if (docSnapshot.empty) {
+                showModal('Error: Document not found.');
+                return;
+            }
+
+            const data = docSnapshot.docs[0].data();
+            let likers = data.likers || [];
+            let dislikes = data.dislikes || [];
+            let likersCount = data.likes;
+            let dislikersCount = data.dislikes;
+
+            const userId = user.uid;
+            const hasLiked = likers.includes(userId);
+            const hasDisliked = dislikes.includes(userId);
+
+            if (voteType === 'like') {
+                if (hasLiked) {
+                    likers = likers.filter(id => id !== userId);
+                    likersCount--;
+                } else {
+                    likers = [...likers, userId];
+                    likersCount++;
+                    if (hasDisliked) {
+                        dislikes = dislikes.filter(id => id !== userId);
+                        dislikersCount--;
+                    }
+                }
+            } else { // voteType === 'dislike'
+                if (hasDisliked) {
+                    dislikes = dislikes.filter(id => id !== userId);
+                    dislikersCount--;
+                } else {
+                    dislikes = [...dislikes, userId];
+                    dislikersCount++;
+                    if (hasLiked) {
+                        likers = likers.filter(id => id !== userId);
+                        likersCount--;
+                    }
+                }
+            }
+            await updateDoc(ref, {
+                likes: likersCount,
+                dislikes: dislikersCount,
+                likers: likers,
+                dislikers: dislikes,
+            });
+        };
+
+
+        // --- Event Listeners ---
+        window.onload = () => {
+            modalOkBtn.onclick = closeModal;
+            postFormEl.onsubmit = handlePostSubmit;
+
+            // Using event delegation for dynamic elements
+            postsContainerEl.addEventListener('click', (e) => {
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                const postId = target.getAttribute('data-post-id');
+                const commentId = target.getAttribute('data-comment-id');
+
+                if (target.classList.contains('delete-post-btn')) {
+                    handlePostDelete(postId);
+                } else if (target.classList.contains('delete-comment-btn')) {
+                    handleCommentDelete(postId, commentId);
+                } else if (target.classList.contains('like-post-btn')) {
+                    handleVote('post', postId, 'like');
+                } else if (target.classList.contains('dislike-post-btn')) {
+                    handleVote('post', postId, 'dislike');
+                } else if (target.classList.contains('like-comment-btn')) {
+                    handleVote('comment', commentId, 'like', postId);
+                } else if (target.classList.contains('dislike-comment-btn')) {
+                    handleVote('comment', commentId, 'dislike', postId);
+                }
+            });
+
+            postsContainerEl.addEventListener('submit', (e) => {
+                const form = e.target.closest('form');
+                if (form.classList.contains('comment-form') || form.classList.contains('comment-reply-form')) {
+                    handleCommentSubmit(e);
+                }
+            });
+
+            // --- Firebase Auth State Listener ---
+            onAuthStateChanged(auth, async (currentUser) => {
+                if (currentUser) {
+                    const isBanned = await isUserBanned(currentUser.uid);
+                    if (isBanned) {
+                        await signOut(auth);
+                        showModal('Your account has been banned. You have been signed out.');
+                        user = null;
+                    } else {
+                        const userDoc = await getDocs(query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where('uid', '==', currentUser.uid)));
+                        if (!userDoc.empty) {
+                            user = { ...currentUser, displayName: userDoc.docs[0].data().displayName };
+                        } else {
+                             user = currentUser;
+                        }
+                    }
+                } else {
+                    user = null;
+                }
+                isAuthReady = true;
+                loadingMessageEl.classList.add('hidden');
+                renderUI();
+            });
+
+            // --- Firestore Real-time Listeners ---
+            const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            onSnapshot(postsRef, (snapshot) => {
+                posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), comments: [] }));
+
+                posts.forEach(post => {
+                    const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
+                    onSnapshot(commentsRef, (commentSnapshot) => {
+                        const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
+                        
+                        const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a,b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        sortedComments.forEach(comment => {
+                            comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a,b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        });
+
+                        const postIndex = posts.findIndex(p => p.id === post.id);
+                        if (postIndex !== -1) {
+                            posts[postIndex].comments = sortedComments;
+                            // Sort posts by creation date after comments are updated
+                            posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+                        }
+
+                        renderPosts();
+                    });
+                });
+                renderPosts();
+            });
+        };
+    </script>
+</body>
+</html>
