@@ -54,14 +54,14 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
 
-    <div class="w-full max-w-2xl bg-white p-6 rounded-xl shadow-lg mb-6 flex justify-between items-center">
+    <div class="w-full max-w-2xl bg-white p-6 rounded-xl shadow-lg mb-6 flex justify-between items-center z-10">
         <h1 class="text-2xl font-bold text-gray-800">The Gemini Platform</h1>
         <div id="auth-ui" class="flex items-center space-x-4">
             <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
         </div>
     </div>
 
-    <div id="main-content" class="w-full max-w-2xl">
+    <div id="main-content" class="w-full max-w-2xl flex-grow mb-20">
         <div id="post-form-container" class="hidden">
             <form id="post-form" class="bg-white p-6 rounded-xl shadow-lg mb-6 w-full mx-auto">
                 <h2 class="text-xl font-bold mb-4 text-gray-800">Create a Post</h2>
@@ -70,9 +70,42 @@
             </form>
         </div>
 
-        <div id="posts-container" class="space-y-6">
+        <div id="home-content" class="space-y-6">
             <p id="loading-message" class="text-center text-gray-500 mt-10">Loading posts...</p>
+            <div id="posts-container"></div>
         </div>
+        
+        <div id="profile-content" class="hidden">
+            <div class="bg-white p-6 rounded-xl shadow-lg mb-6 w-full mx-auto">
+                <div class="flex flex-col items-center text-center">
+                    <h2 id="profile-displayname" class="text-3xl font-bold text-gray-800 mb-2"></h2>
+                    <p id="profile-username" class="text-lg text-gray-500 mb-4"></p>
+                    <p id="profile-bio" class="text-gray-700 mb-6 max-w-lg"></p>
+                    <button id="edit-profile-btn" class="hidden ripple-button px-6 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Edit Profile</button>
+                </div>
+            </div>
+            
+            <div id="edit-profile-form-container" class="hidden">
+                <form id="edit-profile-form" class="bg-white p-6 rounded-xl shadow-lg w-full mx-auto">
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">Edit Your Profile</h3>
+                    <div class="mb-4">
+                        <label for="edit-displayname" class="block text-sm font-medium text-gray-700">Display Name</label>
+                        <input type="text" id="edit-displayname" maxlength="25" class="mt-1 block w-full p-3 border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Your display name">
+                    </div>
+                    <div class="mb-4">
+                        <label for="edit-username" class="block text-sm font-medium text-gray-700">Username</label>
+                        <input type="text" id="edit-username" class="mt-1 block w-full p-3 border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Your unique username">
+                        <p class="mt-1 text-sm text-gray-500">Username can only be changed every 7 days.</p>
+                    </div>
+                    <div class="mb-4">
+                        <label for="edit-bio" class="block text-sm font-medium text-gray-700">Bio</label>
+                        <textarea id="edit-bio" rows="4" class="mt-1 block w-full p-3 border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tell us about yourself..."></textarea>
+                    </div>
+                    <button type="submit" class="ripple-button w-full bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Save Changes</button>
+                </form>
+            </div>
+        </div>
+
     </div>
 
     <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
@@ -81,6 +114,23 @@
             <div class="flex justify-center">
                 <button id="modal-ok-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-200 ripple-button">OK</button>
             </div>
+        </div>
+    </div>
+    
+    <div id="bottom-bar" class="fixed bottom-0 left-0 right-0 bg-white shadow-top-lg border-t border-gray-200 z-40 hidden">
+        <div class="flex justify-around items-center h-16 max-w-2xl mx-auto">
+            <a href="javascript:void(0)" id="nav-home" class="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600 transition duration-150 ease-in-out">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                <span class="text-xs mt-1">Home</span>
+            </a>
+            <a href="javascript:void(0)" id="nav-profile" class="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600 transition duration-150 ease-in-out">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                <span class="text-xs mt-1">Your Profile</span>
+            </a>
         </div>
     </div>
 
@@ -118,12 +168,29 @@
     const modalEl = document.getElementById('modal');
     const modalMessageEl = document.getElementById('modal-message');
     const modalOkBtn = document.getElementById('modal-ok-btn');
+    const homeContentEl = document.getElementById('home-content');
+    const profileContentEl = document.getElementById('profile-content');
+    const editProfileBtn = document.getElementById('edit-profile-btn');
+    const editProfileFormContainerEl = document.getElementById('edit-profile-form-container');
+    const editProfileFormEl = document.getElementById('edit-profile-form');
+    const editDisplayNameInput = document.getElementById('edit-displayname');
+    const editUsernameInput = document.getElementById('edit-username');
+    const editBioInput = document.getElementById('edit-bio');
+    const profileDisplayNameEl = document.getElementById('profile-displayname');
+    const profileUsernameEl = document.getElementById('profile-username');
+    const profileBioEl = document.getElementById('profile-bio');
+    const bottomBarEl = document.getElementById('bottom-bar');
+    const navHomeBtn = document.getElementById('nav-home');
+    const navProfileBtn = document.getElementById('nav-profile');
 
     // --- State variables ---
     let user = null;
     let posts = [];
     let isAuthReady = false;
     let sharedPostId = null;
+    let viewingProfileUsername = null;
+    let postUnsubscribe = null;
+    let commentUnsubscribes = {};
 
     // --- Utility Functions ---
     const showModal = (message) => {
@@ -153,12 +220,10 @@
         }
     };
 
-    const handleShareLink = () => {
+    const handleShareLinkAndProfile = () => {
         const urlParams = new URLSearchParams(window.location.search);
         sharedPostId = urlParams.get('shareid');
-        if (sharedPostId) {
-            postFormContainerEl.classList.add('hidden');
-        }
+        viewingProfileUsername = urlParams.get('profile');
     };
 
     const copyShareLink = (postId) => {
@@ -169,31 +234,106 @@
             .catch(err => console.error('Failed to copy link: ', err));
     };
 
+    const navigateToHome = () => {
+        window.history.pushState({}, '', window.location.pathname);
+        sharedPostId = null;
+        viewingProfileUsername = null;
+        renderUI();
+        setupFirestoreListeners();
+    };
+
+    const navigateToProfile = (username) => {
+        const url = `${window.location.pathname}?profile=${encodeURIComponent(username)}`;
+        window.history.pushState({}, '', url);
+        sharedPostId = null;
+        viewingProfileUsername = username;
+        renderUI();
+        setupFirestoreListeners();
+    };
+
     // --- UI Rendering ---
     const renderUI = () => {
-        if (!sharedPostId) {
-            if (user) {
-                authUiEl.innerHTML = `
-                    <span class="font-medium text-gray-700">Hello, ${user.displayName || 'User'}!</span>
-                    <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
-                `;
-                postFormContainerEl.classList.remove('hidden');
-                document.getElementById('sign-out-btn').onclick = handleSignOut;
-            } else {
-                authUiEl.innerHTML = `
-                    <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
-                `;
-                postFormContainerEl.classList.add('hidden');
-                document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
-            }
+        // Clear all content and hide sections
+        homeContentEl.classList.add('hidden');
+        profileContentEl.classList.add('hidden');
+        postFormContainerEl.classList.add('hidden');
+        authUiEl.innerHTML = '';
+        bottomBarEl.classList.add('hidden');
+
+        if (viewingProfileUsername) {
+            renderProfilePage();
         } else {
-             authUiEl.innerHTML = ''; // Hide auth buttons on shared view
-             postFormContainerEl.classList.add('hidden');
+            renderHomePage();
+        }
+    };
+
+    const renderHomePage = () => {
+        homeContentEl.classList.remove('hidden');
+
+        if (user) {
+            authUiEl.innerHTML = `
+                <span class="font-medium text-gray-700">Hello, ${user.displayName || user.username || 'User'}!</span>
+                <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
+            `;
+            bottomBarEl.classList.remove('hidden');
+            document.getElementById('sign-out-btn').onclick = handleSignOut;
+        } else {
+            authUiEl.innerHTML = `
+                <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
+            `;
+            document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
+        }
+
+        if (user && !sharedPostId) {
+            postFormContainerEl.classList.remove('hidden');
         }
 
         if (isAuthReady) {
             loadingMessageEl.classList.add('hidden');
             renderPosts();
+        }
+    };
+
+    const renderProfilePage = async () => {
+        profileContentEl.classList.remove('hidden');
+        editProfileFormContainerEl.classList.add('hidden');
+        editProfileBtn.classList.add('hidden');
+
+        let profileUser = null;
+        const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
+        const q = query(usersRef, where("username", "==", viewingProfileUsername));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            profileUser = { uid: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+        }
+        
+        if (profileUser) {
+            profileDisplayNameEl.textContent = profileUser.displayName || 'Unnamed User';
+            profileUsernameEl.textContent = `@${profileUser.username}`;
+            profileBioEl.textContent = profileUser.bio || 'No bio yet.';
+            
+            if (user && user.uid === profileUser.uid) {
+                editProfileBtn.classList.remove('hidden');
+            }
+        } else {
+            profileDisplayNameEl.textContent = 'User Not Found';
+            profileUsernameEl.textContent = '';
+            profileBioEl.textContent = 'The profile you are looking for does not exist.';
+        }
+
+        if (user) {
+            authUiEl.innerHTML = `
+                <span class="font-medium text-gray-700">Hello, ${user.displayName || user.username || 'User'}!</span>
+                <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
+            `;
+            bottomBarEl.classList.remove('hidden');
+            document.getElementById('sign-out-btn').onclick = handleSignOut;
+        } else {
+            authUiEl.innerHTML = `
+                <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
+            `;
+            document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
         }
     };
 
@@ -226,7 +366,8 @@
                     <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
                         <div class="flex justify-between items-start">
                             <div class="flex-1">
-                                <p class="font-semibold text-gray-800">${comment.authorName}</p>
+                                <a href="?profile=${encodeURIComponent(comment.authorUsername)}" class="font-semibold text-gray-800 hover:underline">${comment.authorDisplayName}</a>
+                                <span class="text-sm text-gray-500"> @${comment.authorUsername}</span>
                                 <p class="text-sm text-gray-500">${formatDate(comment.createdAt)}</p>
                                 <p class="mt-2 text-gray-700">${comment.content}</p>
                             </div>
@@ -275,7 +416,8 @@
             const postHtml = `
                 <div class="flex justify-between items-start mb-4">
                     <div class="flex-1">
-                        <h2 class="text-lg font-bold text-gray-800">${post.authorName}</h2>
+                        <a href="?profile=${encodeURIComponent(post.authorUsername)}" class="text-lg font-bold text-gray-800 hover:underline">${post.authorDisplayName}</a>
+                        <span class="text-sm text-gray-500"> @${post.authorUsername}</span>
                         <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
                         <p class="mt-2 text-gray-700">${post.content}</p>
                     </div>
@@ -330,9 +472,12 @@
             const userSnap = await getDoc(userRef);
 
             if (!userSnap.exists()) {
+                const username = currentUser.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
                 await setDoc(userRef, {
                     uid: currentUser.uid,
                     displayName: currentUser.displayName,
+                    username,
+                    bio: '',
                     isBanned: false,
                     createdAt: new Date(),
                 });
@@ -346,8 +491,65 @@
     const handleSignOut = async () => {
         await signOut(auth);
         user = null;
-        renderUI();
+        navigateToHome();
         showModal('You have been signed out.');
+    };
+    
+    // --- Profile Handlers ---
+    const handleEditProfile = () => {
+        editProfileFormContainerEl.classList.remove('hidden');
+        profileContentEl.querySelector('.bg-white').classList.add('hidden');
+        editDisplayNameInput.value = user.displayName || '';
+        editUsernameInput.value = user.username || '';
+        editBioInput.value = user.bio || '';
+    };
+
+    const handleEditProfileSubmit = async (e) => {
+        e.preventDefault();
+        const newDisplayName = editDisplayNameInput.value.trim().substring(0, 25);
+        const newUsername = editUsernameInput.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+        const newBio = editBioInput.value.trim();
+
+        if (!newDisplayName || !newUsername) {
+            showModal('Display Name and Username are required.');
+            return;
+        }
+
+        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.data();
+
+        if (newUsername !== userData.username) {
+            const now = new Date();
+            const lastChange = userData.lastUsernameChange?.toDate() || new Date(0);
+            const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+            if (now.getTime() - lastChange.getTime() < sevenDaysInMs) {
+                showModal('You can only change your username once every 7 days.');
+                return;
+            }
+
+            const usernameQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where("username", "==", newUsername));
+            const usernameSnapshot = await getDocs(usernameQuery);
+            if (!usernameSnapshot.empty) {
+                showModal('This username is already taken. Please choose another.');
+                return;
+            }
+            await updateDoc(userRef, {
+                username: newUsername,
+                lastUsernameChange: now,
+            });
+        }
+        
+        await updateDoc(userRef, {
+            displayName: newDisplayName,
+            bio: newBio
+        });
+        
+        user.displayName = newDisplayName;
+        user.username = newUsername;
+        user.bio = newBio;
+        showModal('Profile updated successfully!');
+        navigateToProfile(newUsername);
     };
 
     // --- Post & Comment Handlers ---
@@ -360,7 +562,8 @@
         const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
         await addDoc(postsRef, {
             userId: user.uid,
-            authorName: user.displayName || 'Anonymous',
+            authorDisplayName: user.displayName || 'Anonymous',
+            authorUsername: user.username || 'unknown',
             content: postContentInputEl.value.trim(),
             createdAt: new Date(),
             likes: 0,
@@ -390,7 +593,8 @@
         const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`);
         await addDoc(commentsRef, {
             userId: user.uid,
-            authorName: user.displayName || 'Anonymous',
+            authorDisplayName: user.displayName || 'Anonymous',
+            authorUsername: user.username || 'unknown',
             content,
             createdAt: new Date(),
             likes: 0,
@@ -470,14 +674,36 @@
     };
 
     // --- Firestore Listeners with Share Logic ---
+    const unsubscribeAll = () => {
+        if (postUnsubscribe) {
+            postUnsubscribe();
+            postUnsubscribe = null;
+        }
+        for (const postId in commentUnsubscribes) {
+            if (commentUnsubscribes[postId]) {
+                commentUnsubscribes[postId]();
+            }
+        }
+        commentUnsubscribes = {};
+    };
+
     const setupFirestoreListeners = () => {
+        unsubscribeAll();
+        
+        if (viewingProfileUsername) {
+            // No live post updates on profile page
+            return;
+        }
+
         if (sharedPostId) {
             const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, sharedPostId);
-            onSnapshot(postRef, async (postSnapshot) => {
+            postUnsubscribe = onSnapshot(postRef, async (postSnapshot) => {
                 if (postSnapshot.exists()) {
                     const postData = { id: postSnapshot.id, ...postSnapshot.data(), comments: [] };
                     const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postData.id}/comments`);
-                    const commentSnapshot = await getDocs(commentsRef);
+                    const commentsQuery = query(commentsRef);
+                    
+                    const commentSnapshot = await getDocs(commentsQuery);
                     const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
 
                     const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
@@ -494,13 +720,21 @@
             });
         } else {
             const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
-            onSnapshot(query(postsRef), (snapshot) => {
+            postUnsubscribe = onSnapshot(query(postsRef), (snapshot) => {
                 posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), comments: [] }));
                 posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
 
+                // Unsubscribe from previous comment listeners
+                for (const postId in commentUnsubscribes) {
+                    if (commentUnsubscribes[postId]) {
+                        commentUnsubscribes[postId]();
+                    }
+                }
+                commentUnsubscribes = {};
+
                 posts.forEach(post => {
                     const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
-                    onSnapshot(commentsRef, (commentSnapshot) => {
+                    commentUnsubscribes[post.id] = onSnapshot(commentsRef, (commentSnapshot) => {
                         const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
 
                         const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
@@ -522,12 +756,26 @@
 
     // --- Event Listeners and Initial Setup ---
     window.onload = () => {
-        handleShareLink();
+        handleShareLinkAndProfile();
         modalOkBtn.onclick = closeModal;
         postFormEl.onsubmit = handlePostSubmit;
+        editProfileFormEl.onsubmit = handleEditProfileSubmit;
+        editProfileBtn.onclick = handleEditProfile;
+        navHomeBtn.onclick = navigateToHome;
+        navProfileBtn.onclick = () => {
+            if (user && user.username) {
+                navigateToProfile(user.username);
+            }
+        };
+        
+        window.onpopstate = () => {
+            handleShareLinkAndProfile();
+            renderUI();
+            setupFirestoreListeners();
+        };
 
         postsContainerEl.addEventListener('click', (e) => {
-            const target = e.target.closest('button');
+            const target = e.target.closest('button, a');
             if (!target) return;
 
             const postId = target.getAttribute('data-post-id');
@@ -568,7 +816,7 @@
                     const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
                     const userSnap = await getDoc(userDocRef);
                     if (userSnap.exists()) {
-                        user = { ...currentUser, displayName: userSnap.data().displayName };
+                        user = { ...currentUser, ...userSnap.data() };
                     } else {
                          user = currentUser;
                     }
