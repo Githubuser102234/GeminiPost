@@ -158,7 +158,7 @@
         };
 
         const copyShareLink = (postId) => {
-            const shareUrl = `${window.location.origin}/?shareid=${postId}`;
+            const shareUrl = `GeminiPost/?shareid=${postId}`;
             navigator.clipboard.writeText(shareUrl)
                 .then(() => showModal('Share link copied to clipboard!'))
                 .catch(err => console.error('Failed to copy link: ', err));
