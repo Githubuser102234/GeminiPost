@@ -44,12 +44,8 @@
             transition: 0s;
         }
 
-        .comment-container {
-            display: none;
-        }
-        .comment-container.active {
-            display: block;
-        }
+        .comment-container { display: none; }
+        .comment-container.active { display: block; }
 
         .loader {
             border: 4px solid rgba(255, 255, 255, 0.3);
@@ -64,6 +60,57 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* --- Gallery / Preview styles --- */
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 0.5rem;
+        }
+        .media-grid img,
+        .media-grid video {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 0.75rem;
+        }
+        .media-grid.single img,
+        .media-grid.single video {
+            height: auto;
+            max-height: 480px;
+        }
+        .media-overlay {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .preview-thumb {
+            position: relative;
+        }
+        .preview-x {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 9999px;
+            display: grid;
+            place-items: center;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .shadow-top-lg {
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
@@ -76,6 +123,7 @@
     </div>
 
     <div id="main-content" class="w-full max-w-2xl flex-grow mb-20">
+        <!-- POST FORM MODAL -->
         <div id="post-form-container" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
             <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl mx-auto">
                 <div class="flex justify-between items-center mb-4">
@@ -85,14 +133,20 @@
                 <form id="post-form">
                     <textarea id="post-content-input" class="w-full p-4 border rounded-xl bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" rows="6" placeholder="What's on your mind?"></textarea>
                     
-                    <div class="mt-4 flex items-center space-x-4">
-                        <label for="post-media-input" class="cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
-                            </svg>
-                            <input type="file" id="post-media-input" accept="image/*,video/*" class="hidden">
-                        </label>
-                        <span id="post-media-filename" class="text-sm text-gray-500 truncate max-w-[calc(100%-6rem)]"></span>
+                    <div class="mt-4">
+                        <div class="flex items-center space-x-4">
+                            <label for="post-media-input" class="cursor-pointer" title="Add images">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                                </svg>
+                                <!-- MULTIPLE IMAGES ONLY FOR POSTS -->
+                                <input type="file" id="post-media-input" accept="image/*" class="hidden" multiple>
+                            </label>
+                            <span id="post-media-filename" class="text-sm text-gray-500 truncate max-w-[calc(100%-6rem)]"></span>
+                        </div>
+                        <!-- IMAGE PREVIEWS WITH DELETE (X) -->
+                        <div id="post-media-previews" class="media-grid mt-3"></div>
+                        <p id="post-media-hint" class="text-xs text-gray-500 mt-2">You can add up to 10 images. Large images will be resized by the browser before upload.</p>
                     </div>
 
                     <button type="submit" id="post-submit-btn" class="ripple-button w-full mt-4 bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center" disabled>
@@ -102,6 +156,7 @@
             </div>
         </div>
 
+        <!-- USERNAME PROMPT -->
         <div id="username-form-container" class="hidden">
             <form id="username-form" class="bg-white p-6 rounded-xl shadow-lg w-full mx-auto text-center">
                 <h2 class="text-xl font-bold mb-4 text-gray-800">Choose a Username</h2>
@@ -114,13 +169,20 @@
             </form>
         </div>
 
+        <!-- HOME -->
         <div id="home-content" class="hidden space-y-6">
             <p id="loading-message" class="text-center text-gray-500 mt-10">Loading posts...</p>
             <div id="posts-container"></div>
         </div>
         
+        <!-- PROFILE -->
         <div id="profile-content" class="hidden">
-            <div class="bg-white p-6 rounded-xl shadow-lg mb-6 w-full mx-auto">
+            <div class="relative bg-white p-6 rounded-xl shadow-lg mb-6 w-full mx-auto">
+                <!-- Share button on profile (top-right; matches post share icon) -->
+                <button id="profile-share-btn" class="hidden absolute top-4 right-4 flex items-center text-blue-600 hover:text-blue-700 ripple-button">
+                    <img src="https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/share.png" class="h-6 w-6" alt="Share Profile">
+                </button>
+
                 <div class="flex flex-col items-center text-center">
                     <div class="relative w-32 h-32 mb-4">
                         <img id="profile-pic-display" src="https://placehold.co/128x128/bdbdbd/ffffff?text=U" alt="Profile Picture" class="w-full h-full rounded-full object-cover border-4 border-white shadow-sm">
@@ -162,6 +224,7 @@
 
     </div>
 
+    <!-- MODALS -->
     <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
             <p id="modal-message" class="text-center text-lg font-semibold mb-4 text-gray-800"></p>
@@ -181,6 +244,7 @@
         </div>
     </div>
 
+    <!-- BOTTOM NAV -->
     <div id="bottom-bar" class="fixed bottom-0 left-0 right-0 bg-white shadow-top-lg border-t border-gray-200 z-40 hidden">
         <div class="flex justify-around items-center h-16 max-w-2xl mx-auto">
             <a href="javascript:void(0)" id="nav-home" class="flex flex-col items-center justify-center text-gray-600 hover:text-blue-600 transition duration-150 ease-in-out">
@@ -210,7 +274,7 @@
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.2/+esm';
     
-    // User's provided Firebase configuration
+    // Firebase configuration
     const firebaseConfig = {
         apiKey: "AIzaSyBpm4VrxpjKLrPXcjK-C9EflMrMAL8Atow",
         authDomain: "geminipost-f6d80.firebaseapp.com",
@@ -221,7 +285,7 @@
         measurementId: "G-QW46D9VR04"
     };
 
-    // Supabase Configuration
+    // Supabase configuration
     const SUPABASE_URL = 'https://viouovbltbthzfeiqhpz.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpb3VvdmJsdGJ0aHpmZWlxaHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NjU3MjAsImV4cCI6MjA3MjQ0MTcyMH0.AFvyJ07swOffiJJESIAZ9HueDq6p1rj2BzxqX4C4Gmk';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -240,6 +304,8 @@
     const postContentInputEl = document.getElementById('post-content-input');
     const postMediaInputEl = document.getElementById('post-media-input');
     const postMediaFilenameEl = document.getElementById('post-media-filename');
+    const postMediaPreviewsEl = document.getElementById('post-media-previews');
+    const postMediaHintEl = document.getElementById('post-media-hint');
     const postSubmitBtn = document.getElementById('post-submit-btn');
     const closePostFormBtn = document.getElementById('close-post-form');
     const postsContainerEl = document.getElementById('posts-container');
@@ -253,6 +319,7 @@
     const confirmActionBtn = document.getElementById('confirm-action-btn');
     const homeContentEl = document.getElementById('home-content');
     const profileContentEl = document.getElementById('profile-content');
+    const profileShareBtn = document.getElementById('profile-share-btn');
     const editProfileBtn = document.getElementById('edit-profile-btn');
     const editProfileFormContainerEl = document.getElementById('edit-profile-form-container');
     const editProfileFormEl = document.getElementById('edit-profile-form');
@@ -283,11 +350,14 @@
     let postUnsubscribe = null;
     let profilePostsUnsubscribe = null;
     let commentUnsubscribes = {};
-    let postMediaFile = null;
+    let postMediaFiles = []; // multiple post images
     let currentPostIdToDelete = null;
     
-    // This Map will store the media file for a specific comment form
+    // Map for comment media file (single per comment as before)
     const commentMediaFiles = new Map(); 
+
+    // Limits
+    const MAX_POST_IMAGES = 10;
 
     // --- Utility Functions ---
     const showModal = (message) => {
@@ -311,15 +381,19 @@
         btn.disabled = true;
     };
     
-    const hideLoadingIndicator = (btn, originalText) => {
-        btn.innerHTML = originalText;
+    const hideLoadingIndicator = (btn, originalHtml) => {
+        btn.innerHTML = originalHtml;
         btn.disabled = false;
     };
 
+    const safeToDate = (ts) => {
+        try { return ts?.toDate ? ts.toDate() : null; } catch { return null; }
+    };
+
     const formatDate = (timestamp) => {
-        if (!timestamp) return 'Just now';
-        const date = timestamp.toDate();
-        return date.toLocaleString();
+        const d = safeToDate(timestamp);
+        if (!d) return 'Just now';
+        return d.toLocaleString();
     };
 
     const isUserBanned = async (userId) => {
@@ -358,6 +432,14 @@
             .catch(err => console.error('Failed to copy link: ', err));
     };
 
+    const copyProfileShareLink = (username) => {
+        const baseUrl = window.location.href.split('?')[0];
+        const shareUrl = `${baseUrl}?profile=${encodeURIComponent(username)}`;
+        navigator.clipboard.writeText(shareUrl)
+            .then(() => showModal('Profile link copied to clipboard!'))
+            .catch(err => console.error('Failed to copy profile link: ', err));
+    };
+
     const navigateToHome = () => {
         window.history.pushState({}, '', window.location.pathname);
         sharedPostId = null;
@@ -379,7 +461,7 @@
         if (user && user.username) {
             postFormContainerEl.classList.remove('hidden');
             postContentInputEl.focus();
-            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0;
+            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && postMediaFiles.length === 0;
         } else if (user && !user.username) {
             showModal('Please choose a username before posting.');
         } else {
@@ -387,16 +469,21 @@
         }
     };
     
-    const hidePostForm = () => {
-        postFormContainerEl.classList.add('hidden');
-        postMediaFile = null;
+    const clearPostForm = () => {
+        postMediaFiles = [];
         postContentInputEl.value = '';
         postMediaInputEl.value = '';
         postMediaFilenameEl.textContent = '';
+        postMediaPreviewsEl.innerHTML = '';
         postSubmitBtn.disabled = true;
     };
+
+    const hidePostForm = () => {
+        postFormContainerEl.classList.add('hidden');
+        clearPostForm();
+    };
     
-    // Helper function to extract path from a Supabase public URL
+    // Helper: extract path from Supabase public URL
     const getPathFromSupabaseUrl = (url, bucket) => {
         if (!url || !url.includes(SUPABASE_URL)) return null;
         const basePath = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/`;
@@ -435,18 +522,44 @@
         return profileUrl;
     };
 
-    const renderMedia = (mediaUrl) => {
+    // Render media (posts can be array now; comments stay single)
+    const renderMedia = (media) => {
+        if (!media) return '';
+        // Back-compat: if it's a string (old single mediaUrl)
+        if (typeof media === 'string') {
+            return renderSingleMedia(media);
+        }
+        // If it's an array (mediaUrls)
+        if (Array.isArray(media) && media.length > 0) {
+            const firstFour = media.slice(0, 4);
+            const extra = media.length - firstFour.length;
+            const isSingle = media.length === 1;
+            const gridClass = isSingle ? 'media-grid single' : 'media-grid';
+            const items = firstFour.map((url, idx) => {
+                const content = url.match(/\.(mp4|mov|avi|wmv|mkv)$/i)
+                    ? `<video controls src="${url}"></video>`
+                    : `<img src="${url}" alt="attachment">`;
+                const overlay = (extra > 0 && idx === firstFour.length - 1)
+                    ? `<span class="media-overlay">+${extra}</span>`
+                    : '';
+                return `<div class="relative">${content}${overlay}</div>`;
+            }).join('');
+            return `<div class="${gridClass}">${items}</div>`;
+        }
+        return '';
+    };
+
+    const renderSingleMedia = (mediaUrl) => {
         if (!mediaUrl) return '';
         if (mediaUrl.match(/\.(mp4|mov|avi|wmv|mkv)$/i)) {
             return `<video controls src="${mediaUrl}" class="w-full rounded-xl mt-2"></video>`;
         } else {
-            return `<img src="${mediaUrl}" class="w-full rounded-xl object-cover mt-2">`;
+            return `<img src="${mediaUrl}" class="w-full rounded-xl object-cover mt-2" alt="attachment">`;
         }
     };
 
     // --- UI Rendering ---
     const renderUI = () => {
-        // Clear all content and hide sections
         homeContentEl.classList.add('hidden');
         profileContentEl.classList.add('hidden');
         usernameFormContainerEl.classList.add('hidden');
@@ -499,6 +612,7 @@
         editProfileFormContainerEl.classList.add('hidden');
         editProfileBtn.classList.add('hidden');
         profilePicLabelEl.classList.add('hidden');
+        profileShareBtn.classList.add('hidden');
 
         const profileUser = await getUserDataFromUsername(viewingProfileUsername);
         
@@ -514,6 +628,11 @@
                 profileUsernameEl.textContent = `@${profileUser.username}`;
                 profileBioEl.textContent = profileUser.bio || 'No bio yet.';
                 profilePicDisplayEl.src = getProfilePicUrl(profileUser.photoURL, false);
+
+                // show share button for any profile found
+                profileShareBtn.classList.remove('hidden');
+                profileShareBtn.onclick = () => copyProfileShareLink(profileUser.username);
+
                 if (user && user.uid === profileUser.uid) {
                     editProfileBtn.classList.remove('hidden');
                     profilePicLabelEl.classList.remove('hidden');
@@ -544,7 +663,7 @@
 
     const renderPosts = (postList, container) => {
         container.innerHTML = '';
-        if (postList.length === 0) {
+        if (!postList || postList.length === 0) {
             container.innerHTML = `<p class="text-center text-gray-500 mt-10">No posts yet.</p>`;
             return;
         }
@@ -555,9 +674,10 @@
             postEl.setAttribute('data-post-id', post.id);
 
             const renderComments = (commentList) => {
+                if (!commentList) return '';
                 return commentList.map(comment => {
-                    const isLikedByCurrentUser = user && comment.likers.includes(user.uid);
-                    const isDislikedByCurrentUser = user && comment.dislikers.includes(user.uid);
+                    const isLikedByCurrentUser = user && (comment.likers || []).includes(user.uid);
+                    const isDislikedByCurrentUser = user && (comment.dislikers || []).includes(user.uid);
                     const commentProfilePicUrl = getProfilePicUrl(comment.authorPhotoURL, false);
 
                     const likeIcon = isLikedByCurrentUser
@@ -568,7 +688,7 @@
                         ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike%202.png'
                         : 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike.png';
                         
-                    const commentMediaHtml = renderMedia(comment.mediaUrl);
+                    const commentMediaHtml = renderSingleMedia(comment.mediaUrl);
 
                     return `
                     <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
@@ -576,11 +696,11 @@
                              <div class="flex-shrink-0 mr-4">
                                 <img src="${commentProfilePicUrl}" alt="Profile Picture" class="w-10 h-10 rounded-full object-cover">
                             </div>
-                            <div class="flex-1">
+                            <div class="flex-1 min-w-0">
                                 <a href="?profile=${encodeURIComponent(comment.authorUsername)}" class="font-semibold text-gray-800 hover:underline">${comment.authorDisplayName}</a>
                                 <span class="text-sm text-gray-500"> @${comment.authorUsername}</span>
                                 <p class="text-sm text-gray-500">${formatDate(comment.createdAt)}</p>
-                                <p class="mt-2 text-gray-700">${comment.content}</p>
+                                <p class="mt-2 text-gray-700 break-words">${comment.content || ''}</p>
                             </div>
                             ${user && comment.userId === user.uid ? `
                                 <button class="delete-comment-btn text-red-500 hover:text-red-700 ml-2" data-comment-id="${comment.id}" data-post-id="${post.id}">
@@ -594,18 +714,18 @@
                         <div class="flex items-center space-x-4 mt-2">
                             <button class="like-comment-btn flex items-center ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
                                 <img src="${likeIcon}" class="h-5 w-5" alt="Like">
-                                <span class="ml-1 text-sm ${isLikedByCurrentUser ? 'text-green-600' : 'text-gray-600'}">${comment.likes}</span>
+                                <span class="ml-1 text-sm ${isLikedByCurrentUser ? 'text-green-600' : 'text-gray-600'}">${comment.likes || 0}</span>
                             </button>
                             <button class="dislike-comment-btn flex items-center ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
                                 <img src="${dislikeIcon}" class="h-5 w-5" alt="Dislike">
-                                <span class="ml-1 text-sm ${isDislikedByCurrentUser ? 'text-red-600' : 'text-gray-600'}">${comment.dislikes}</span>
+                                <span class="ml-1 text-sm ${isDislikedByCurrentUser ? 'text-red-600' : 'text-gray-600'}">${comment.dislikes || 0}</span>
                             </button>
                         </div>
                         ${user ? `
                             <form class="comment-reply-form mt-2" data-post-id="${post.id}" data-parent-comment-id="${comment.id}">
                                 <div class="flex">
                                     <input type="text" name="comment-content" class="flex-1 p-2 text-sm border rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Reply...">
-                                    <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600">Reply</button>
+                                    <button type="submit" class="reply-submit-btn ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600" disabled>Reply</button>
                                 </div>
                                 <div class="mt-2 flex items-center space-x-4">
                                      <label for="reply-media-input-${comment.id}" class="cursor-pointer">
@@ -625,8 +745,8 @@
                 `}).join('');
             };
             
-            const isLikedByCurrentUser = user && post.likers.includes(user.uid);
-            const isDislikedByCurrentUser = user && post.dislikers.includes(user.uid);
+            const isLikedByCurrentUser = user && (post.likers || []).includes(user.uid);
+            const isDislikedByCurrentUser = user && (post.dislikers || []).includes(user.uid);
             const postProfilePicUrl = getProfilePicUrl(post.authorPhotoURL, post.isBanned);
 
             const likeIcon = isLikedByCurrentUser
@@ -637,23 +757,24 @@
                 ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike%202.png'
                 : 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike.png';
 
-            const postMediaHtml = renderMedia(post.mediaUrl);
+            // Back-compat: support old {mediaUrl} and new {mediaUrls}
+            const postMediaHtml = post.mediaUrls ? renderMedia(post.mediaUrls) : renderMedia(post.mediaUrl);
 
             const postHtml = `
                 <div class="flex justify-between items-start mb-4">
-                    <div class="flex items-start flex-1">
+                    <div class="flex items-start flex-1 min-w-0">
                         <div class="flex-shrink-0 mr-4">
                              <img src="${postProfilePicUrl}" alt="Profile Picture" class="w-12 h-12 rounded-full object-cover">
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <a href="?profile=${encodeURIComponent(post.authorUsername)}" class="text-lg font-bold text-gray-800 hover:underline">${post.authorDisplayName}</a>
                             <span class="text-sm text-gray-500"> @${post.authorUsername}</span>
                             <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
-                            <p class="mt-2 text-gray-700">${post.content}</p>
+                            <p class="mt-2 text-gray-700 break-words">${post.content || ''}</p>
                         </div>
                     </div>
                     ${user && post.userId === user.uid ? `
-                        <button class="delete-post-btn text-red-500 hover:text-red-700 ml-4" data-post-id="${post.id}">
+                        <button class="delete-post-btn text-red-500 hover:text-red-700 ml-4" data-post-id="${post.id}" title="Delete post">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                             </svg>
@@ -664,11 +785,11 @@
                 <div class="flex items-center space-x-6 mt-4">
                     <button class="like-post-btn flex items-center ripple-button" data-post-id="${post.id}">
                         <img src="${likeIcon}" class="h-6 w-6" alt="Like">
-                        <span class="ml-1 text-base ${isLikedByCurrentUser ? 'text-green-600' : 'text-gray-600'}">${post.likes}</span>
+                        <span class="ml-1 text-base ${isLikedByCurrentUser ? 'text-green-600' : 'text-gray-600'}">${post.likes || 0}</span>
                     </button>
                     <button class="dislike-post-btn flex items-center ripple-button" data-post-id="${post.id}">
                         <img src="${dislikeIcon}" class="h-6 w-6" alt="Dislike">
-                        <span class="ml-1 text-base ${isDislikedByCurrentUser ? 'text-red-600' : 'text-gray-600'}">${post.dislikes}</span>
+                        <span class="ml-1 text-base ${isDislikedByCurrentUser ? 'text-red-600' : 'text-gray-600'}">${post.dislikes || 0}</span>
                     </button>
                     <button class="share-post-btn flex items-center text-blue-600 hover:text-blue-700 ripple-button" data-post-id="${post.id}">
                         <img src="https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/share.png" class="h-6 w-6" alt="Share">
@@ -788,6 +909,7 @@
         const file = e.target.files[0];
         if (!file) return;
 
+        const originalHtml = profilePicLabelEl.innerHTML;
         showLoadingIndicator(profilePicLabelEl, 'Uploading...');
         
         const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
@@ -805,7 +927,6 @@
             profilePicDisplayEl.src = photoURL;
             await updateAllPostsAndComments(user.uid, null, null, user.photoURL);
             
-            // Delete old profile picture if it exists and is from Supabase
             if (oldPhotoURL && oldPhotoURL.includes(SUPABASE_URL)) {
                 const oldPath = getPathFromSupabaseUrl(oldPhotoURL, 'profiles');
                 await deleteFile('profiles', oldPath);
@@ -814,7 +935,7 @@
             showModal('Profile picture updated successfully!');
         }
         
-        hideLoadingIndicator(profilePicLabelEl, `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>`);
+        hideLoadingIndicator(profilePicLabelEl, originalHtml);
     };
 
     const handleEditProfile = () => {
@@ -827,9 +948,9 @@
 
     const handleEditProfileSubmit = async (e) => {
         e.preventDefault();
-        const newDisplayName = editDisplayNameInput.value.trim().substring(0, 25);
-        const newUsername = editUsernameInput.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
-        const newBio = editBioInput.value.trim();
+        const newDisplayName = (editDisplayNameInput.value || '').trim().substring(0, 25);
+        const newUsername = (editUsernameInput.value || '').trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+        const newBio = (editBioInput.value || '').trim();
 
         if (!newDisplayName || !newUsername) {
             showModal('Display Name and Username are required.');
@@ -843,7 +964,7 @@
 
         if (newUsername !== userData.username) {
             const now = new Date();
-            const lastChange = userData.lastUsernameChange?.toDate() || new Date(0);
+            const lastChange = userData.lastUsernameChange?.toDate ? userData.lastUsernameChange.toDate() : new Date(0);
             const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
             if (now.getTime() - lastChange.getTime() < sevenDaysInMs) {
                 showModal('You can only change your username once every 7 days.');
@@ -871,7 +992,7 @@
         user.username = newUsername;
         user.bio = newBio;
         
-        await updateAllPostsAndComments(user.uid, newDisplayName, newUsername, undefined);
+        await updateAllPostsAndComments(user.uid, newDisplayName, usernameChanged ? newUsername : null, undefined);
         
         showModal('Profile updated successfully!');
         navigateToProfile(newUsername);
@@ -880,21 +1001,24 @@
     // --- Post & Comment Handlers ---
     const handlePostSubmit = async (e) => {
         e.preventDefault();
-        if (!user || (!postContentInputEl.value.trim() && !postMediaFile)) {
-            showModal('Please write something to post or attach media.');
+        if (!user || (!postContentInputEl.value.trim() && postMediaFiles.length === 0)) {
+            showModal('Please write something to post or attach images.');
             return;
         }
         
-        const originalBtnText = postSubmitBtn.innerHTML;
+        const originalBtnHtml = postSubmitBtn.innerHTML;
         showLoadingIndicator(postSubmitBtn, 'Uploading...');
 
-        let mediaUrl = null;
-        if (postMediaFile) {
-            const mediaPath = `${user.uid}/posts/${Date.now()}-${postMediaFile.name}`;
-            mediaUrl = await uploadFile('media', mediaPath, postMediaFile);
-            if (!mediaUrl) {
-                hideLoadingIndicator(postSubmitBtn, originalBtnText);
-                return;
+        let mediaUrls = [];
+        if (postMediaFiles.length > 0) {
+            for (const file of postMediaFiles) {
+                const mediaPath = `${user.uid}/posts/${Date.now()}-${file.name}`;
+                const url = await uploadFile('media', mediaPath, file);
+                if (!url) {
+                    hideLoadingIndicator(postSubmitBtn, originalBtnHtml);
+                    return;
+                }
+                mediaUrls.push(url);
             }
         }
         
@@ -905,7 +1029,9 @@
             authorUsername: user.username || 'unknown',
             authorPhotoURL: user.photoURL || null,
             content: postContentInputEl.value.trim(),
-            mediaUrl: mediaUrl,
+            // New field with backwards compatibility
+            mediaUrls: mediaUrls.length ? mediaUrls : null,
+            mediaUrl: mediaUrls.length === 1 ? mediaUrls[0] : null,
             createdAt: serverTimestamp(),
             likes: 0,
             dislikes: 0,
@@ -913,31 +1039,79 @@
             dislikers: [],
         });
         hidePostForm();
-        hideLoadingIndicator(postSubmitBtn, originalBtnText);
+        hideLoadingIndicator(postSubmitBtn, originalBtnHtml);
     };
     
+    const refreshPostSubmitState = () => {
+        postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && postMediaFiles.length === 0;
+    };
+
+    const renderPostPreviews = () => {
+        postMediaPreviewsEl.innerHTML = '';
+        postMediaFilenameEl.textContent = postMediaFiles.length ? `${postMediaFiles.length} image${postMediaFiles.length>1?'s':''} selected` : '';
+        const firstFour = postMediaFiles.slice(0, 4);
+        const extra = postMediaFiles.length - firstFour.length;
+        firstFour.forEach((file, idx) => {
+            const url = URL.createObjectURL(file);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'preview-thumb relative';
+            wrapper.innerHTML = `
+                <img src="${url}" class="w-full h-40 object-cover rounded-xl" alt="preview">
+                <span class="preview-x" data-index="${idx}" title="Remove">×</span>
+                ${extra>0 && idx===firstFour.length-1 ? `<span class="media-overlay">+${extra}</span>` : ''}
+            `;
+            postMediaPreviewsEl.appendChild(wrapper);
+        });
+    };
+
     const handlePostMediaChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            postMediaFile = file;
-            postMediaFilenameEl.textContent = file.name;
-        } else {
-            postMediaFile = null;
+        const files = Array.from(e.target.files || [])
+            .filter(f => f.type.startsWith('image/'));
+        if (files.length === 0) {
+            postMediaFiles = [];
+            postMediaPreviewsEl.innerHTML = '';
             postMediaFilenameEl.textContent = '';
+            refreshPostSubmitState();
+            return;
         }
-        postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && !postMediaFile;
+        const total = postMediaFiles.length + files.length;
+        if (total > MAX_POST_IMAGES) {
+            showModal(`You can only attach up to ${MAX_POST_IMAGES} images.`);
+        }
+        const remaining = Math.max(0, MAX_POST_IMAGES - postMediaFiles.length);
+        postMediaFiles = postMediaFiles.concat(files.slice(0, remaining));
+        renderPostPreviews();
+        refreshPostSubmitState();
+        // reset input so same file can be re-selected later if removed
+        e.target.value = '';
+    };
+
+    const handleRemovePreview = (indexInView) => {
+        // indexInView corresponds to index in firstFour view; rebuild from real list by removing correct item
+        // We compute actual index mapping by using displayed firstFour
+        const firstFour = postMediaFiles.slice(0, 4);
+        const fileToRemove = firstFour[indexInView];
+        const realIndex = postMediaFiles.indexOf(fileToRemove);
+        if (realIndex > -1) {
+            postMediaFiles.splice(realIndex, 1);
+        }
+        renderPostPreviews();
+        refreshPostSubmitState();
     };
 
     const handlePostContentChange = () => {
-        postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && !postMediaFile;
+        refreshPostSubmitState();
     };
     
     const handleCommentContentChange = (e) => {
         const form = e.target.closest('form');
+        if (!form) return;
         const submitBtn = form.querySelector('.comment-submit-btn, .reply-submit-btn');
-        const content = form.querySelector('input[name="comment-content"]').value.trim();
-        const mediaFile = commentMediaFiles.get(form.getAttribute('data-post-id') + (form.getAttribute('data-parent-comment-id') || ''));
-        submitBtn.disabled = content.length === 0 && !mediaFile;
+        const contentEl = form.querySelector('input[name="comment-content"]');
+        const content = (contentEl?.value || '').trim();
+        const key = form.getAttribute('data-post-id') + (form.getAttribute('data-parent-comment-id') || '');
+        const mediaFile = commentMediaFiles.get(key);
+        if (submitBtn) submitBtn.disabled = content.length === 0 && !mediaFile;
     };
 
     const handleCommentMediaChange = (e) => {
@@ -946,20 +1120,20 @@
         const commentId = e.target.getAttribute('data-comment-id');
         const key = commentId ? `${postId}-${commentId}` : postId;
         
+        const filenameEl = document.getElementById(`comment-media-filename-${postId}`) || document.getElementById(`reply-media-filename-${commentId}`);
+
         if (file) {
             commentMediaFiles.set(key, file);
-            const filenameEl = document.getElementById(`comment-media-filename-${postId}`) || document.getElementById(`reply-media-filename-${commentId}`);
             if (filenameEl) filenameEl.textContent = file.name;
         } else {
             commentMediaFiles.delete(key);
-            const filenameEl = document.getElementById(`comment-media-filename-${postId}`) || document.getElementById(`reply-media-filename-${commentId}`);
             if (filenameEl) filenameEl.textContent = '';
         }
 
         const form = e.target.closest('form');
         const submitBtn = form.querySelector('.comment-submit-btn, .reply-submit-btn');
         const content = form.querySelector('input[name="comment-content"]').value.trim();
-        submitBtn.disabled = content.length === 0 && !file;
+        if (submitBtn) submitBtn.disabled = content.length === 0 && !file;
     };
 
     const handlePostDelete = async (postId) => {
@@ -973,8 +1147,10 @@
             const postSnap = await getDoc(postRef);
             if (postSnap.exists() && postSnap.data().userId === user.uid) {
                 const postData = postSnap.data();
-                if (postData.mediaUrl) {
-                    const mediaPath = getPathFromSupabaseUrl(postData.mediaUrl, 'media');
+                // Delete any attached media
+                const urls = Array.isArray(postData.mediaUrls) ? postData.mediaUrls : (postData.mediaUrl ? [postData.mediaUrl] : []);
+                for (const url of urls) {
+                    const mediaPath = getPathFromSupabaseUrl(url, 'media');
                     await deleteFile('media', mediaPath);
                 }
                 await deleteDoc(postRef);
@@ -993,11 +1169,11 @@
         const postId = e.target.getAttribute('data-post-id');
         const parentCommentId = e.target.getAttribute('data-parent-comment-id');
         const contentInput = e.target.querySelector('input[name="comment-content"]');
-        const content = contentInput.value.trim();
+        const content = (contentInput?.value || '').trim();
         const key = parentCommentId ? `${postId}-${parentCommentId}` : postId;
         const mediaFile = commentMediaFiles.get(key);
         const submitBtn = e.target.querySelector('button[type="submit"]');
-        const originalBtnText = submitBtn.innerHTML;
+        const originalBtnHtml = submitBtn.innerHTML;
 
         if (!content && !mediaFile) {
             showModal('Please write a comment or add media.');
@@ -1011,7 +1187,7 @@
             const mediaPath = `${user.uid}/comments/${Date.now()}-${mediaFile.name}`;
             mediaUrl = await uploadFile('media', mediaPath, mediaFile);
             if (!mediaUrl) {
-                hideLoadingIndicator(submitBtn, originalBtnText);
+                hideLoadingIndicator(submitBtn, originalBtnHtml);
                 return;
             }
         }
@@ -1033,28 +1209,8 @@
         });
         e.target.reset();
         commentMediaFiles.delete(key);
-        hideLoadingIndicator(submitBtn, originalBtnText);
+        hideLoadingIndicator(submitBtn, originalBtnHtml);
         submitBtn.disabled = true;
-    };
-
-    const handleCommentDelete = async (postId, commentId) => {
-        if (!user) return;
-        showConfirmationModal('Are you sure you want to delete this comment? This action cannot be undone.', async () => {
-            const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
-            const commentSnap = await getDoc(commentRef);
-            if (commentSnap.exists() && commentSnap.data().userId === user.uid) {
-                const commentData = commentSnap.data();
-                if (commentData.mediaUrl) {
-                     const mediaPath = getPathFromSupabaseUrl(commentData.mediaUrl, 'media');
-                     await deleteFile('media', mediaPath);
-                }
-                await deleteDoc(commentRef);
-                showModal('Comment deleted successfully!');
-            } else {
-                showModal('You are not authorized to delete this comment.');
-            }
-            confirmationModalEl.classList.add('hidden');
-        });
     };
 
     // --- Like/Dislike Handlers ---
@@ -1078,8 +1234,8 @@
         const data = docSnapshot.data();
         let likers = data.likers || [];
         let dislikers = data.dislikers || [];
-        let likesCount = data.likes;
-        let dislikesCount = data.dislikes;
+        let likesCount = data.likes || 0;
+        let dislikesCount = data.dislikes || 0;
 
         const userId = user.uid;
         const hasLiked = likers.includes(userId);
@@ -1097,7 +1253,7 @@
                     dislikesCount--;
                 }
             }
-        } else { // voteType === 'dislike'
+        } else { // dislike
             if (hasDisliked) {
                 dislikers = dislikers.filter(id => id !== userId);
                 dislikesCount--;
@@ -1120,18 +1276,10 @@
 
     // --- Firestore Listeners with Share Logic ---
     const unsubscribeAll = () => {
-        if (postUnsubscribe) {
-            postUnsubscribe();
-            postUnsubscribe = null;
-        }
-        if (profilePostsUnsubscribe) {
-            profilePostsUnsubscribe();
-            profilePostsUnsubscribe = null;
-        }
+        if (postUnsubscribe) { postUnsubscribe(); postUnsubscribe = null; }
+        if (profilePostsUnsubscribe) { profilePostsUnsubscribe(); profilePostsUnsubscribe = null; }
         for (const postId in commentUnsubscribes) {
-            if (commentUnsubscribes[postId]) {
-                commentUnsubscribes[postId]();
-            }
+            if (commentUnsubscribes[postId]) { commentUnsubscribes[postId](); }
         }
         commentUnsubscribes = {};
     };
@@ -1159,15 +1307,15 @@
                     const postsQuery = query(postsRef, where("userId", "==", profileUserId));
                     profilePostsUnsubscribe = onSnapshot(postsQuery, async (postsSnapshot) => {
                         let profilePosts = postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), comments: [] }));
-                        profilePosts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+                        profilePosts.sort((a, b) => (safeToDate(b.createdAt)?.getTime() || 0) - (safeToDate(a.createdAt)?.getTime() || 0));
 
                         for (const post of profilePosts) {
                             const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
                             const commentSnapshot = await getDocs(commentsRef);
                             const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
-                            const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                            const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => (safeToDate(a.createdAt)?.getTime() || 0) - (safeToDate(b.createdAt)?.getTime() || 0));
                             sortedComments.forEach(comment => {
-                                comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                                comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => (safeToDate(a.createdAt)?.getTime() || 0) - (safeToDate(b.createdAt)?.getTime() || 0));
                             });
                             post.comments = sortedComments;
                         }
@@ -1196,9 +1344,9 @@
                     commentUnsubscribes[postData.id] = onSnapshot(commentsRef, (commentSnapshot) => {
                         const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
 
-                        const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => (safeToDate(a.createdAt)?.getTime() || 0) - (safeToDate(b.createdAt)?.getTime() || 0));
                         sortedComments.forEach(comment => {
-                            comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                            comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => (safeToDate(a.createdAt)?.getTime() || 0) - (safeToDate(b.createdAt)?.getTime() || 0));
                         });
                         
                         postData.comments = sortedComments;
@@ -1230,7 +1378,7 @@
                 });
 
                 posts = postsWithUserData.filter(post => !post.isBanned);
-                posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+                posts.sort((a, b) => (safeToDate(b.createdAt)?.getTime() || 0) - (safeToDate(a.createdAt)?.getTime() || 0));
 
                 for (const postId in commentUnsubscribes) {
                     if (commentUnsubscribes[postId]) {
@@ -1254,9 +1402,9 @@
                              };
                         });
 
-                        const sortedComments = commentsWithUserData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        const sortedComments = commentsWithUserData.filter(c => !c.parentCommentId).sort((a, b) => (safeToDate(a.createdAt)?.getTime() || 0) - (safeToDate(b.createdAt)?.getTime() || 0));
                         sortedComments.forEach(comment => {
-                            comment.replies = commentsWithUserData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                            comment.replies = commentsWithUserData.filter(c => c.parentCommentId === comment.id).sort((a, b) => (safeToDate(a.createdAt)?.getTime() || 0) - (safeToDate(b.createdAt)?.getTime() || 0));
                         });
 
                         const postIndex = posts.findIndex(p => p.id === post.id);
@@ -1288,8 +1436,20 @@
         navProfileBtn.onclick = () => {
             if (user && user.username) {
                 navigateToProfile(user.username);
+            } else {
+                showModal('Please sign in and set a username to view your profile.');
             }
         };
+
+        // Remove image preview
+        postMediaPreviewsEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('.preview-x');
+            if (!btn) return;
+            const idx = parseInt(btn.getAttribute('data-index'), 10);
+            if (!isNaN(idx)) {
+                handleRemovePreview(idx);
+            }
+        });
         
         document.addEventListener('input', (e) => {
             if (e.target.closest('.comment-form') || e.target.closest('.comment-reply-form')) {
@@ -1376,5 +1536,107 @@
         });
     };
 </script>
+</body>
+</html>
+
+                -comment-btn')) {
+                await handleVote('comment', commentId, 'like', postId);
+            } else if (target.classList.contains('dislike-comment-btn')) {
+                await handleVote('comment', commentId, 'dislike', postId);
+            } else if (target.classList.contains('share-post-btn')) {
+                copyShareLink(postId);
+            }
+        });
+
+        onAuthStateChanged(auth, async (firebaseUser) => {
+            isAuthReady = true;
+            if (firebaseUser) {
+                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, firebaseUser.uid);
+                const userDoc = await getDoc(userDocRef);
+
+                if (!userDoc.exists()) {
+                    await setDoc(userDocRef, {
+                        displayName: firebaseUser.displayName || 'Anonymous',
+                        username: null,
+                        photoURL: firebaseUser.photoURL || null,
+                        bio: '',
+                        createdAt: serverTimestamp(),
+                    });
+                    user = { uid: firebaseUser.uid, displayName: firebaseUser.displayName || 'Anonymous', username: null, photoURL: firebaseUser.photoURL || null, bio: '' };
+                    renderUI();
+                } else {
+                    const userData = userDoc.data();
+                    if (userData.isBanned) {
+                        await signOut(auth);
+                        showModal('Your account has been banned.');
+                        return;
+                    }
+                    
+                    user = {
+                        uid: firebaseUser.uid,
+                        displayName: userData.displayName || firebaseUser.displayName || 'Anonymous',
+                        username: userData.username,
+                        photoURL: userData.photoURL || firebaseUser.photoURL || null,
+                        bio: userData.bio || '',
+                    };
+                    renderUI();
+                    setupFirestoreListeners();
+                }
+            } else {
+                user = null;
+                renderUI();
+                setupFirestoreListeners();
+            }
+        });
+    };
+
+    // --- Missing function patched: handleCommentDelete (was referenced but not defined) ---
+    const handleCommentDelete = async (postId, commentId) => {
+        if (!user) return;
+        const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
+        const commentSnap = await getDoc(commentRef);
+        if (commentSnap.exists() && commentSnap.data().userId === user.uid) {
+            const commentData = commentSnap.data();
+            if (commentData.mediaUrl) {
+                const mediaPath = getPathFromSupabaseUrl(commentData.mediaUrl, 'media');
+                await deleteFile('media', mediaPath);
+            }
+            await deleteDoc(commentRef);
+            showModal('Comment deleted successfully!');
+        } else {
+            showModal('You are not authorized to delete this comment.');
+        }
+        confirmationModalEl.classList.add('hidden');
+    };
+ </script>
+
+    <!-- FAB Post Button (for quick access on desktop too) -->
+    <button id="fab-post" class="hidden md:flex fixed bottom-24 right-6 w-14 h-14 rounded-full bg-blue-600 text-white items-center justify-center shadow-xl hover:bg-blue-700 ripple-button" title="New Post">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+    </button>
+    <script>
+        // Make FAB visible after auth (mirrors bottom bar post)
+        (function(){
+            const fab = document.getElementById('fab-post');
+            document.addEventListener('click', function(e){
+                if (e.target.closest('#fab-post')) {
+                    const btn = document.getElementById('nav-post');
+                    if (btn) btn.click();
+                }
+            });
+            // Observe bottom bar visibility
+            const bottom = document.getElementById('bottom-bar');
+            const observer = new MutationObserver(() => {
+                if (!bottom.classList.contains('hidden')) {
+                    fab.classList.remove('hidden');
+                } else {
+                    fab.classList.add('hidden');
+                }
+            });
+            observer.observe(bottom, { attributes: true });
+        })();
+    </script>
 </body>
 </html>
