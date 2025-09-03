@@ -70,6 +70,17 @@
                 </div>
                 <form id="post-form">
                     <textarea id="post-content-input" class="w-full p-4 border rounded-xl bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" rows="6" placeholder="What's on your mind?"></textarea>
+                    
+                    <div class="mt-4 flex items-center space-x-4">
+                        <label for="post-media-input" class="cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                            </svg>
+                            <input type="file" id="post-media-input" accept="image/*,video/*" class="hidden">
+                        </label>
+                        <span id="post-media-filename" class="text-sm text-gray-500 truncate max-w-[calc(100%-6rem)]"></span>
+                    </div>
+
                     <button type="submit" class="ripple-button w-full mt-4 bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Post</button>
                 </form>
             </div>
@@ -95,6 +106,15 @@
         <div id="profile-content" class="hidden">
             <div class="bg-white p-6 rounded-xl shadow-lg mb-6 w-full mx-auto">
                 <div class="flex flex-col items-center text-center">
+                    <div class="relative w-32 h-32 mb-4">
+                        <img id="profile-pic-display" src="https://placehold.co/128x128/bdbdbd/ffffff?text=U" alt="Profile Picture" class="w-full h-full rounded-full object-cover border-4 border-white shadow-sm">
+                        <label for="profile-pic-input" id="profile-pic-label" class="absolute bottom-0 right-0 p-2 bg-blue-600 text-white rounded-full cursor-pointer hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                            <input type="file" id="profile-pic-input" accept="image/*" class="hidden">
+                        </label>
+                    </div>
                     <h2 id="profile-displayname" class="text-3xl font-bold text-gray-800 mb-2"></h2>
                     <p id="profile-username" class="text-lg text-gray-500 mb-4"></p>
                     <p id="profile-bio" class="text-gray-700 mb-6 max-w-lg"></p>
@@ -162,6 +182,7 @@
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
     import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.2/+esm';
     
     // User's provided Firebase configuration
     const firebaseConfig = {
@@ -174,6 +195,11 @@
         measurementId: "G-QW46D9VR04"
     };
 
+    // Supabase Configuration
+    const SUPABASE_URL = 'https://viouovbltbthzfeiqhpz.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpb3VvdmJsdGJ0aHpmZWlxaHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NjU3MjAsImV4cCI6MjA3MjQ0MTcyMH0.AFvyJ07swOffiJJESIAZ9HueDq6p1rj2BzxqX4C4Gmk';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
@@ -186,6 +212,8 @@
     const postFormContainerEl = document.getElementById('post-form-container');
     const postFormEl = document.getElementById('post-form');
     const postContentInputEl = document.getElementById('post-content-input');
+    const postMediaInputEl = document.getElementById('post-media-input');
+    const postMediaFilenameEl = document.getElementById('post-media-filename');
     const closePostFormBtn = document.getElementById('close-post-form');
     const postsContainerEl = document.getElementById('posts-container');
     const loadingMessageEl = document.getElementById('loading-message');
@@ -203,6 +231,9 @@
     const profileDisplayNameEl = document.getElementById('profile-displayname');
     const profileUsernameEl = document.getElementById('profile-username');
     const profileBioEl = document.getElementById('profile-bio');
+    const profilePicDisplayEl = document.getElementById('profile-pic-display');
+    const profilePicInputEl = document.getElementById('profile-pic-input');
+    const profilePicLabelEl = document.getElementById('profile-pic-label');
     const profilePostsContainerEl = document.getElementById('profile-posts-container');
     const bottomBarEl = document.getElementById('bottom-bar');
     const navHomeBtn = document.getElementById('nav-home');
@@ -221,6 +252,7 @@
     let postUnsubscribe = null;
     let profilePostsUnsubscribe = null;
     let commentUnsubscribes = {};
+    let postMediaFile = null;
 
     // --- Utility Functions ---
     const showModal = (message) => {
@@ -304,6 +336,31 @@
     
     const hidePostForm = () => {
         postFormContainerEl.classList.add('hidden');
+        postMediaFile = null;
+        postContentInputEl.value = '';
+        postMediaInputEl.value = '';
+        postMediaFilenameEl.textContent = '';
+    };
+
+    // --- Media Uploads ---
+    const uploadFile = async (bucket, path, file) => {
+        try {
+            const { data, error } = await supabase.storage.from(bucket).upload(path, file);
+            if (error) throw error;
+            const publicUrl = supabase.storage.from(bucket).getPublicUrl(data.path).data.publicUrl;
+            return publicUrl;
+        } catch (error) {
+            console.error('File upload error:', error);
+            showModal(`Error uploading file: ${error.message}`);
+            return null;
+        }
+    };
+    
+    const getProfilePicUrl = (profileUrl, isBanned) => {
+        if (isBanned || !profileUrl) {
+            return 'https://placehold.co/128x128/bdbdbd/ffffff?text=U';
+        }
+        return profileUrl;
     };
 
     // --- UI Rendering ---
@@ -360,6 +417,7 @@
         profileContentEl.classList.remove('hidden');
         editProfileFormContainerEl.classList.add('hidden');
         editProfileBtn.classList.add('hidden');
+        profilePicLabelEl.classList.add('hidden');
 
         const profileUser = await getUserDataFromUsername(viewingProfileUsername);
         
@@ -369,12 +427,15 @@
                 profileUsernameEl.textContent = `@${profileUser.username}`;
                 profileBioEl.innerHTML = `<h3 class="text-3xl font-bold text-red-600 mt-10">Account Banned</h3><p class="text-gray-500 mt-2">This account is no longer available</p>`;
                 profilePostsContainerEl.innerHTML = '';
+                profilePicDisplayEl.src = getProfilePicUrl(profileUser.photoURL, true);
             } else {
                 profileDisplayNameEl.textContent = profileUser.displayName || 'Unnamed User';
                 profileUsernameEl.textContent = `@${profileUser.username}`;
                 profileBioEl.textContent = profileUser.bio || 'No bio yet.';
+                profilePicDisplayEl.src = getProfilePicUrl(profileUser.photoURL, false);
                 if (user && user.uid === profileUser.uid) {
                     editProfileBtn.classList.remove('hidden');
+                    profilePicLabelEl.classList.remove('hidden');
                 }
             }
         } else {
@@ -382,6 +443,7 @@
             profileUsernameEl.textContent = '';
             profileBioEl.textContent = 'The profile you are looking for does not exist.';
             profilePostsContainerEl.innerHTML = '';
+            profilePicDisplayEl.src = getProfilePicUrl(null, false);
         }
 
         if (user) {
@@ -415,6 +477,7 @@
                 return commentList.map(comment => {
                     const isLikedByCurrentUser = user && comment.likers.includes(user.uid);
                     const isDislikedByCurrentUser = user && comment.dislikers.includes(user.uid);
+                    const commentProfilePicUrl = getProfilePicUrl(comment.authorPhotoURL, false);
 
                     const likeIcon = isLikedByCurrentUser
                         ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/like%202.png'
@@ -427,6 +490,9 @@
                     return `
                     <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
                         <div class="flex justify-between items-start">
+                             <div class="flex-shrink-0 mr-4">
+                                <img src="${commentProfilePicUrl}" alt="Profile Picture" class="w-10 h-10 rounded-full object-cover">
+                            </div>
                             <div class="flex-1">
                                 <a href="?profile=${encodeURIComponent(comment.authorUsername)}" class="font-semibold text-gray-800 hover:underline">${comment.authorDisplayName}</a>
                                 <span class="text-sm text-gray-500"> @${comment.authorUsername}</span>
@@ -466,6 +532,7 @@
             
             const isLikedByCurrentUser = user && post.likers.includes(user.uid);
             const isDislikedByCurrentUser = user && post.dislikers.includes(user.uid);
+            const postProfilePicUrl = getProfilePicUrl(post.authorPhotoURL, post.isBanned);
 
             const likeIcon = isLikedByCurrentUser
                 ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/like%202.png'
@@ -475,13 +542,26 @@
                 ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike%202.png'
                 : 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike.png';
 
+            const mediaHtml = post.mediaUrl ? `
+                <div class="mt-4">
+                    ${post.mediaUrl.match(/\.(mp4|mov|avi|wmv|mkv)$/i) ? 
+                        `<video controls src="${post.mediaUrl}" class="w-full rounded-xl"></video>` : 
+                        `<img src="${post.mediaUrl}" class="w-full rounded-xl object-cover">`}
+                </div>
+            ` : '';
+
             const postHtml = `
                 <div class="flex justify-between items-start mb-4">
-                    <div class="flex-1">
-                        <a href="?profile=${encodeURIComponent(post.authorUsername)}" class="text-lg font-bold text-gray-800 hover:underline">${post.authorDisplayName}</a>
-                        <span class="text-sm text-gray-500"> @${post.authorUsername}</span>
-                        <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
-                        <p class="mt-2 text-gray-700">${post.content}</p>
+                    <div class="flex items-start flex-1">
+                        <div class="flex-shrink-0 mr-4">
+                             <img src="${postProfilePicUrl}" alt="Profile Picture" class="w-12 h-12 rounded-full object-cover">
+                        </div>
+                        <div>
+                            <a href="?profile=${encodeURIComponent(post.authorUsername)}" class="text-lg font-bold text-gray-800 hover:underline">${post.authorDisplayName}</a>
+                            <span class="text-sm text-gray-500"> @${post.authorUsername}</span>
+                            <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
+                            <p class="mt-2 text-gray-700">${post.content}</p>
+                        </div>
                     </div>
                     ${user && post.userId === user.uid ? `
                         <button class="delete-post-btn text-red-500 hover:text-red-700 ml-4" data-post-id="${post.id}">
@@ -491,7 +571,8 @@
                         </button>
                     ` : ''}
                 </div>
-                <div class="flex items-center space-x-6">
+                ${mediaHtml}
+                <div class="flex items-center space-x-6 mt-4">
                     <button class="like-post-btn flex items-center ripple-button" data-post-id="${post.id}">
                         <img src="${likeIcon}" class="h-6 w-6" alt="Like">
                         <span class="ml-1 text-base ${isLikedByCurrentUser ? 'text-green-600' : 'text-gray-600'}">${post.likes}</span>
@@ -570,6 +651,22 @@
         showModal('Username saved successfully!');
         navigateToHome();
     };
+    
+    const handleProfilePicChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const filePath = `${user.uid}/${Date.now()}-${file.name}`;
+        const photoURL = await uploadFile('profiles', filePath, file);
+        
+        if (photoURL) {
+            const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+            await updateDoc(userRef, { photoURL });
+            user.photoURL = photoURL;
+            profilePicDisplayEl.src = photoURL;
+            showModal('Profile picture updated successfully!');
+        }
+    };
 
     const handleEditProfile = () => {
         editProfileFormContainerEl.classList.remove('hidden');
@@ -634,20 +731,40 @@
             showModal('Please write something to post.');
             return;
         }
+
+        let mediaUrl = null;
+        if (postMediaFile) {
+            const mediaPath = `${user.uid}/${Date.now()}-${postMediaFile.name}`;
+            mediaUrl = await uploadFile('media', mediaPath, postMediaFile);
+            if (!mediaUrl) return; // Stop if upload failed
+        }
+        
         const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
         await addDoc(postsRef, {
             userId: user.uid,
             authorDisplayName: user.displayName || 'Anonymous',
             authorUsername: user.username || 'unknown',
+            authorPhotoURL: user.photoURL || null,
             content: postContentInputEl.value.trim(),
+            mediaUrl: mediaUrl,
             createdAt: serverTimestamp(),
             likes: 0,
             dislikes: 0,
             likers: [],
             dislikers: [],
         });
-        postContentInputEl.value = '';
         hidePostForm();
+    };
+    
+    const handlePostMediaChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            postMediaFile = file;
+            postMediaFilenameEl.textContent = file.name;
+        } else {
+            postMediaFile = null;
+            postMediaFilenameEl.textContent = '';
+        }
     };
 
     const handlePostDelete = async (postId) => {
@@ -676,6 +793,7 @@
             userId: user.uid,
             authorDisplayName: user.displayName || 'Anonymous',
             authorUsername: user.username || 'unknown',
+            authorPhotoURL: user.photoURL || null,
             content,
             createdAt: serverTimestamp(),
             likes: 0,
@@ -856,14 +974,19 @@
             postUnsubscribe = onSnapshot(query(postsRef), async (snapshot) => {
                 const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                // Filter out posts from banned users
-                const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
-                const allUsersSnapshot = await getDocs(usersRef);
-                const bannedUsers = allUsersSnapshot.docs
-                    .filter(doc => doc.data().isBanned)
-                    .map(doc => doc.id);
+                // Fetch user data for each post to check for banned status
+                const postsWithUserData = await Promise.all(fetchedPosts.map(async post => {
+                    const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, post.userId);
+                    const userSnap = await getDoc(userRef);
+                    const userData = userSnap.exists() ? userSnap.data() : {};
+                    return {
+                        ...post,
+                        authorPhotoURL: userData.photoURL || null,
+                        isBanned: userData.isBanned || false
+                    };
+                }));
 
-                posts = fetchedPosts.filter(post => !bannedUsers.includes(post.userId));
+                posts = postsWithUserData.filter(post => !post.isBanned);
                 posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
 
                 // Unsubscribe from previous comment listeners
@@ -876,12 +999,23 @@
 
                 posts.forEach(post => {
                     const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
-                    commentUnsubscribes[post.id] = onSnapshot(commentsRef, (commentSnapshot) => {
-                        const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
+                    commentUnsubscribes[post.id] = onSnapshot(commentsRef, async (commentSnapshot) => {
+                        const fetchedComments = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
+                        
+                        // Fetch user data for each comment to get profile pictures
+                        const commentsWithUserData = await Promise.all(fetchedComments.map(async comment => {
+                             const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, comment.userId);
+                             const userSnap = await getDoc(userRef);
+                             const userData = userSnap.exists() ? userSnap.data() : {};
+                             return {
+                                ...comment,
+                                authorPhotoURL: userData.photoURL || null
+                             };
+                        }));
 
-                        const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        const sortedComments = commentsWithUserData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
                         sortedComments.forEach(comment => {
-                            comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                            comment.replies = commentsWithUserData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
                         });
 
                         const postIndex = posts.findIndex(p => p.id === post.id);
@@ -901,10 +1035,12 @@
         handleShareLinkAndProfile();
         modalOkBtn.onclick = closeModal;
         postFormEl.onsubmit = handlePostSubmit;
+        postMediaInputEl.onchange = handlePostMediaChange;
         closePostFormBtn.onclick = hidePostForm;
         usernameFormEl.onsubmit = handleUsernameSubmit;
         editProfileFormEl.onsubmit = handleEditProfileSubmit;
         editProfileBtn.onclick = handleEditProfile;
+        profilePicInputEl.onchange = handleProfilePicChange;
         navHomeBtn.onclick = navigateToHome;
         navPostBtn.onclick = showPostForm;
         navProfileBtn.onclick = () => {
@@ -968,8 +1104,9 @@
                             bio: '',
                             isBanned: false,
                             createdAt: serverTimestamp(),
+                            photoURL: currentUser.photoURL,
                         });
-                        user = { ...currentUser, username: null };
+                        user = { ...currentUser, username: null, photoURL: currentUser.photoURL };
                     }
                 }
             } else {
