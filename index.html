@@ -180,7 +180,7 @@
  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc, serverTimestamp, writeBatch, collectionGroup } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.2/+esm';
     
@@ -253,6 +253,9 @@
     let profilePostsUnsubscribe = null;
     let commentUnsubscribes = {};
     let postMediaFile = null;
+    
+    // This Map will store the media file for a specific comment form
+    const commentMediaFiles = new Map(); 
 
     // --- Utility Functions ---
     const showModal = (message) => {
@@ -361,6 +364,15 @@
             return 'https://placehold.co/128x128/bdbdbd/ffffff?text=U';
         }
         return profileUrl;
+    };
+
+    const renderMedia = (mediaUrl) => {
+        if (!mediaUrl) return '';
+        if (mediaUrl.match(/\.(mp4|mov|avi|wmv|mkv)$/i)) {
+            return `<video controls src="${mediaUrl}" class="w-full rounded-xl mt-2"></video>`;
+        } else {
+            return `<img src="${mediaUrl}" class="w-full rounded-xl object-cover mt-2">`;
+        }
     };
 
     // --- UI Rendering ---
@@ -487,6 +499,8 @@
                         ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike%202.png'
                         : 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike.png';
                         
+                    const commentMediaHtml = renderMedia(comment.mediaUrl);
+
                     return `
                     <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
                         <div class="flex justify-between items-start">
@@ -507,6 +521,7 @@
                                 </button>
                             ` : ''}
                         </div>
+                        ${commentMediaHtml}
                         <div class="flex items-center space-x-4 mt-2">
                             <button class="like-comment-btn flex items-center ripple-button" data-comment-id="${comment.id}" data-post-id="${post.id}">
                                 <img src="${likeIcon}" class="h-5 w-5" alt="Like">
@@ -518,9 +533,20 @@
                             </button>
                         </div>
                         ${user ? `
-                            <form class="comment-reply-form mt-2 flex" data-post-id="${post.id}" data-parent-comment-id="${comment.id}">
-                                <input type="text" name="comment" class="flex-1 p-2 text-sm border rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Reply...">
-                                <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600">Reply</button>
+                            <form class="comment-reply-form mt-2" data-post-id="${post.id}" data-parent-comment-id="${comment.id}">
+                                <div class="flex">
+                                    <input type="text" name="comment-content" class="flex-1 p-2 text-sm border rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Reply...">
+                                    <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600">Reply</button>
+                                </div>
+                                <div class="mt-2 flex items-center space-x-4">
+                                     <label for="reply-media-input-${comment.id}" class="cursor-pointer">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                                        </svg>
+                                        <input type="file" id="reply-media-input-${comment.id}" accept="image/*,video/*" class="hidden" data-post-id="${post.id}" data-comment-id="${comment.id}">
+                                    </label>
+                                    <span id="reply-media-filename-${comment.id}" class="text-xs text-gray-500 truncate max-w-[calc(100%-4rem)]"></span>
+                                </div>
                             </form>
                         ` : ''}
                         <div class="pl-6 mt-4 border-l-2 border-gray-300 space-y-4">
@@ -542,13 +568,7 @@
                 ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike%202.png'
                 : 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike.png';
 
-            const mediaHtml = post.mediaUrl ? `
-                <div class="mt-4">
-                    ${post.mediaUrl.match(/\.(mp4|mov|avi|wmv|mkv)$/i) ? 
-                        `<video controls src="${post.mediaUrl}" class="w-full rounded-xl"></video>` : 
-                        `<img src="${post.mediaUrl}" class="w-full rounded-xl object-cover">`}
-                </div>
-            ` : '';
+            const postMediaHtml = renderMedia(post.mediaUrl);
 
             const postHtml = `
                 <div class="flex justify-between items-start mb-4">
@@ -571,7 +591,7 @@
                         </button>
                     ` : ''}
                 </div>
-                ${mediaHtml}
+                ${postMediaHtml}
                 <div class="flex items-center space-x-6 mt-4">
                     <button class="like-post-btn flex items-center ripple-button" data-post-id="${post.id}">
                         <img src="${likeIcon}" class="h-6 w-6" alt="Like">
@@ -589,9 +609,20 @@
                 <div class="mt-4">
                     <h3 class="text-lg font-semibold text-gray-800">Comments</h3>
                     ${user ? `
-                        <form class="comment-form mt-2 flex" data-post-id="${post.id}">
-                            <input type="text" name="comment" class="flex-1 p-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Add a comment...">
-                            <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Comment</button>
+                        <form class="comment-form mt-2" data-post-id="${post.id}">
+                            <div class="flex">
+                                <input type="text" name="comment-content" class="flex-1 p-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Add a comment...">
+                                <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Comment</button>
+                            </div>
+                            <div class="mt-2 flex items-center space-x-4">
+                                <label for="comment-media-input-${post.id}" class="cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                                    </svg>
+                                    <input type="file" id="comment-media-input-${post.id}" accept="image/*,video/*" class="hidden" data-post-id="${post.id}">
+                                </label>
+                                <span id="comment-media-filename-${post.id}" class="text-sm text-gray-500 truncate max-w-[calc(100%-4rem)]"></span>
+                            </div>
                         </form>
                     ` : ''}
                     <div class="comments-list mt-4 space-y-4">
@@ -771,7 +802,7 @@
 
         let mediaUrl = null;
         if (postMediaFile) {
-            const mediaPath = `${user.uid}/${Date.now()}-${postMediaFile.name}`;
+            const mediaPath = `${user.uid}/posts/${Date.now()}-${postMediaFile.name}`;
             mediaUrl = await uploadFile('media', mediaPath, postMediaFile);
             if (!mediaUrl) return; // Stop if upload failed
         }
@@ -804,6 +835,23 @@
         }
     };
 
+    const handleCommentMediaChange = (e) => {
+        const file = e.target.files[0];
+        const postId = e.target.getAttribute('data-post-id');
+        const commentId = e.target.getAttribute('data-comment-id');
+        const key = commentId ? `${postId}-${commentId}` : postId;
+        
+        if (file) {
+            commentMediaFiles.set(key, file);
+            const filenameEl = document.getElementById(`comment-media-filename-${postId}`) || document.getElementById(`reply-media-filename-${commentId}`);
+            if (filenameEl) filenameEl.textContent = file.name;
+        } else {
+            commentMediaFiles.delete(key);
+            const filenameEl = document.getElementById(`comment-media-filename-${postId}`) || document.getElementById(`reply-media-filename-${commentId}`);
+            if (filenameEl) filenameEl.textContent = '';
+        }
+    };
+
     const handlePostDelete = async (postId) => {
         if (!user) return;
         const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
@@ -821,9 +869,21 @@
 
         const postId = e.target.getAttribute('data-post-id');
         const parentCommentId = e.target.getAttribute('data-parent-comment-id');
-        const content = e.target.querySelector('input[name="comment"]').value;
+        const content = e.target.querySelector('input[name="comment-content"]').value;
+        const key = parentCommentId ? `${postId}-${parentCommentId}` : postId;
+        const mediaFile = commentMediaFiles.get(key);
 
-        if (!content.trim()) return;
+        if (!content.trim() && !mediaFile) {
+            showModal('Please write a comment or add media.');
+            return;
+        }
+        
+        let mediaUrl = null;
+        if (mediaFile) {
+            const mediaPath = `${user.uid}/comments/${Date.now()}-${mediaFile.name}`;
+            mediaUrl = await uploadFile('media', mediaPath, mediaFile);
+            if (!mediaUrl) return;
+        }
 
         const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`);
         await addDoc(commentsRef, {
@@ -832,6 +892,7 @@
             authorUsername: user.username || 'unknown',
             authorPhotoURL: user.photoURL || null,
             content,
+            mediaUrl: mediaUrl,
             createdAt: serverTimestamp(),
             likes: 0,
             dislikes: 0,
@@ -840,6 +901,7 @@
             parentCommentId,
         });
         e.target.reset();
+        commentMediaFiles.delete(key);
     };
 
     const handleCommentDelete = async (postId, commentId) => {
@@ -936,7 +998,6 @@
         unsubscribeAll();
         
         if (user && !user.username) {
-            // No live updates on username form
             return;
         }
 
@@ -949,7 +1010,7 @@
                     const profileUserData = userSnapshot.docs[0].data();
 
                     if (profileUserData.isBanned) {
-                        return; // Stop listening to posts if user is banned
+                        return;
                     }
                     
                     const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
@@ -1011,7 +1072,6 @@
             postUnsubscribe = onSnapshot(query(postsRef), async (snapshot) => {
                 const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                // Fetch user data for each post to check for banned status
                 const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
                 const allUsersSnapshot = await getDocs(usersRef);
                 const usersMap = new Map(allUsersSnapshot.docs.map(doc => [doc.id, doc.data()]));
@@ -1030,7 +1090,6 @@
                 posts = postsWithUserData.filter(post => !post.isBanned);
                 posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
 
-                // Unsubscribe from previous comment listeners
                 for (const postId in commentUnsubscribes) {
                     if (commentUnsubscribes[postId]) {
                         commentUnsubscribes[postId]();
@@ -1040,7 +1099,7 @@
 
                 posts.forEach(post => {
                     const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
-                    commentUnsubscribes[post.id] = onSnapshot(commentsRef, async (commentSnapshot) => {
+                    commentUnsubscribes[post.id] = onSnapshot(commentsRef, (commentSnapshot) => {
                         const fetchedComments = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
                         
                         const commentsWithUserData = fetchedComments.map(comment => {
@@ -1089,6 +1148,14 @@
             }
         };
         
+        document.addEventListener('change', (e) => {
+            if (e.target.id.startsWith('comment-media-input-')) {
+                handleCommentMediaChange(e);
+            } else if (e.target.id.startsWith('reply-media-input-')) {
+                handleCommentMediaChange(e);
+            }
+        });
+
         document.addEventListener('click', (e) => {
             const target = e.target.closest('button, a');
             if (!target) return;
@@ -1118,7 +1185,8 @@
 
         document.addEventListener('submit', (e) => {
             const form = e.target.closest('form');
-            if ((form && form.classList.contains('comment-form')) || form.classList.contains('comment-reply-form')) {
+            if (form && (form.classList.contains('comment-form') || form.classList.contains('comment-reply-form'))) {
+                e.preventDefault();
                 handleCommentSubmit(e);
             }
         });
@@ -1136,11 +1204,10 @@
                     if (userSnap.exists()) {
                         user = { ...currentUser, ...userSnap.data() };
                     } else {
-                        // Create a basic user profile for new sign-ins
                         await setDoc(userDocRef, {
                             uid: currentUser.uid,
                             displayName: currentUser.displayName,
-                            username: null, // Set to null to trigger username creation form
+                            username: null,
                             bio: '',
                             isBanned: false,
                             createdAt: serverTimestamp(),
