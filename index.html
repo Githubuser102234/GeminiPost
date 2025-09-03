@@ -489,20 +489,29 @@
 
     const renderPostMedia = (mediaUrls) => {
         if (!mediaUrls || mediaUrls.length === 0) return '';
-
-        const imagesHtml = mediaUrls.slice(0, 2).map(url => {
-            return `<img src="${url}" class="w-1/2 h-32 object-cover rounded-xl" alt="Post media">`;
+    
+        const numImages = mediaUrls.length;
+        const imagesToDisplay = numImages > 2 ? mediaUrls.slice(0, 2) : mediaUrls;
+    
+        let imagesHtml = imagesToDisplay.map((url, index) => {
+            return `<img src="${url}" class="w-full h-32 object-cover rounded-xl ${numImages > 1 ? 'w-1/2' : ''}" alt="Post media">`;
         }).join('');
-
+    
         let overflowHtml = '';
-        if (mediaUrls.length > 2) {
-            overflowHtml = `<div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white text-3xl font-bold rounded-xl">+${mediaUrls.length - 2}</div>`;
+        if (numImages > 2) {
+            overflowHtml = `
+                <div class="relative w-1/2 h-32">
+                    <img src="${mediaUrls[1]}" class="w-full h-32 object-cover rounded-xl" alt="Post media">
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white text-3xl font-bold rounded-xl">+${numImages - 1}</div>
+                </div>
+            `;
+            imagesHtml = `<img src="${mediaUrls[0]}" class="w-1/2 h-32 object-cover rounded-xl" alt="Post media">`;
         }
-
+    
         return `
             <div class="mt-4 flex gap-2">
                 ${imagesHtml}
-                ${mediaUrls.length > 2 ? `<div class="relative w-1/2 h-32">${imagesHtml} ${overflowHtml}</div>` : ''}
+                ${overflowHtml}
             </div>
         `;
     };
@@ -528,16 +537,23 @@
 
     const renderUsernameForm = () => {
         usernameFormContainerEl.classList.remove('hidden');
-        authUiEl.innerHTML = `
-            <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
-        `;
-        document.getElementById('sign-out-btn').onclick = handleSignOut;
+        if(user) {
+            authUiEl.innerHTML = `
+                <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
+            `;
+            document.getElementById('sign-out-btn').onclick = handleSignOut;
+        } else {
+             authUiEl.innerHTML = `
+                <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
+            `;
+            document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
+        }
     };
 
     const renderHomePage = () => {
         homeContentEl.classList.remove('hidden');
 
-        if (user) {
+        if (user && user.username) {
             authUiEl.innerHTML = `
                 <span class="font-medium text-gray-700">Hello, ${user.displayName || user.username || 'User'}!</span>
                 <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
@@ -560,9 +576,6 @@
     const renderProfilePage = async () => {
         profileContentEl.classList.remove('hidden');
         editProfileFormContainerEl.classList.add('hidden');
-        editProfileBtn.classList.add('hidden');
-        shareProfileBtn.classList.add('hidden');
-        profilePicLabelEl.classList.add('hidden');
 
         const profileUser = await getUserDataFromUsername(viewingProfileUsername);
         
@@ -577,6 +590,9 @@
             if (user && user.uid === profileUser.uid) {
                 editProfileBtn.classList.remove('hidden');
                 profilePicLabelEl.classList.remove('hidden');
+            } else {
+                editProfileBtn.classList.add('hidden');
+                profilePicLabelEl.classList.add('hidden');
             }
         } else {
             profileDisplayNameEl.textContent = 'User Not Found';
@@ -584,9 +600,12 @@
             profileBioEl.textContent = 'The profile you are looking for does not exist.';
             profilePostsContainerEl.innerHTML = '';
             profilePicDisplayEl.src = getProfilePicUrl(null, false);
+            shareProfileBtn.classList.add('hidden');
+            editProfileBtn.classList.add('hidden');
+            profilePicLabelEl.classList.add('hidden');
         }
 
-        if (user) {
+        if (user && user.username) {
             authUiEl.innerHTML = `
                 <span class="font-medium text-gray-700">Hello, ${user.displayName || user.username || 'User'}!</span>
                 <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
@@ -997,43 +1016,47 @@
         hideLoadingIndicator(postSubmitBtn, originalBtnText);
     };
     
-    const handlePostMediaChange = async (e) => {
-        const files = e.target.files;
+    const handlePostMediaChange = async () => {
+        const files = postMediaInputEl.files;
+        postMediaFiles = [];
+        mediaPreviewsEl.innerHTML = '';
         if (!files || files.length === 0) {
-            postMediaFiles = [];
+            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0;
+            return;
+        }
+
+        const isVideoAttached = Array.from(files).some(file => file.type.startsWith('video'));
+        if (isVideoAttached) {
+            const videoFile = Array.from(files).find(file => file.type.startsWith('video'));
+            postMediaFiles.push(videoFile);
+            const imgUrl = URL.createObjectURL(videoFile);
+            mediaPreviewsEl.innerHTML = `
+                <div class="relative group">
+                    <video src="${imgUrl}" class="w-24 h-24 object-cover rounded-md"></video>
+                    <button type="button" class="absolute top-1 right-1 p-1 bg-gray-800 bg-opacity-70 text-white rounded-full text-xs hover:bg-opacity-100 remove-media-btn" data-index="0">&times;</button>
+                </div>
+            `;
         } else {
-            postMediaFiles = [];
-            mediaPreviewsEl.innerHTML = '';
-            for (const file of files) {
-                if (file.type.startsWith('video')) {
-                    postMediaFiles = [file];
-                    break;
-                } else if (file.type.startsWith('image')) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (file.type.startsWith('image')) {
                     try {
                         const resizedBlob = await resizeImage(file);
                         postMediaFiles.push(resizedBlob);
+                        const previewContainer = document.createElement('div');
+                        previewContainer.className = 'relative group';
+                        const imgUrl = URL.createObjectURL(resizedBlob);
+                        previewContainer.innerHTML = `
+                            <img src="${imgUrl}" class="w-24 h-24 object-cover rounded-md" alt="Preview">
+                            <button type="button" class="absolute top-1 right-1 p-1 bg-gray-800 bg-opacity-70 text-white rounded-full text-xs hover:bg-opacity-100 remove-media-btn" data-index="${postMediaFiles.length - 1}">&times;</button>
+                        `;
+                        mediaPreviewsEl.appendChild(previewContainer);
                     } catch (err) {
                         console.error("Image resizing failed:", err);
                     }
                 }
             }
         }
-        
-        // Render previews
-        mediaPreviewsEl.innerHTML = '';
-        postMediaFiles.forEach((file, index) => {
-            const previewContainer = document.createElement('div');
-            previewContainer.className = 'relative group';
-            const imgUrl = URL.createObjectURL(file);
-            previewContainer.innerHTML = `
-                <img src="${imgUrl}" class="w-24 h-24 object-cover rounded-md" alt="Preview">
-                <button type="button" class="absolute top-1 right-1 p-1 bg-gray-800 bg-opacity-70 text-white rounded-full text-xs hover:bg-opacity-100 remove-media-btn" data-index="${index}">
-                    &times;
-                </button>
-            `;
-            mediaPreviewsEl.appendChild(previewContainer);
-        });
-
         postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && postMediaFiles.length === 0;
     };
 
@@ -1160,6 +1183,10 @@
         commentMediaFiles.delete(key);
         hideLoadingIndicator(submitBtn, originalBtnText);
         submitBtn.disabled = true;
+        const filenameEl = e.target.querySelector('span[id^="comment-media-filename-"], span[id^="reply-media-filename-"]');
+        if (filenameEl) {
+            filenameEl.textContent = '';
+        }
     };
 
     const handleCommentDelete = async (postId, commentId) => {
@@ -1438,13 +1465,15 @@
         };
         
         document.addEventListener('input', (e) => {
-            if (e.target.closest('.comment-form') || e.target.closest('.comment-reply-form')) {
+            const form = e.target.closest('form');
+            if (form && (form.classList.contains('comment-form') || form.classList.contains('comment-reply-form'))) {
                 handleCommentContentChange(e);
             }
         });
 
         document.addEventListener('change', (e) => {
-            if (e.target.id.startsWith('comment-media-input-') || e.target.id.startsWith('reply-media-input-')) {
+            const form = e.target.closest('form');
+            if (form && (e.target.id.startsWith('comment-media-input-') || e.target.id.startsWith('reply-media-input-'))) {
                 handleCommentMediaChange(e);
             }
         });
@@ -1474,9 +1503,11 @@
             } else if (target.classList.contains('share-post-btn')) {
                 copyShareLink(postId);
             } else if (target.classList.contains('remove-media-btn')) {
-                const indexToRemove = target.getAttribute('data-index');
-                postMediaFiles.splice(indexToRemove, 1);
-                handlePostMediaChange({ target: postMediaInputEl });
+                const indexToRemove = parseInt(target.getAttribute('data-index'));
+                if (indexToRemove >= 0 && indexToRemove < postMediaFiles.length) {
+                    postMediaFiles.splice(indexToRemove, 1);
+                    await handlePostMediaChange();
+                }
             }
         });
 
