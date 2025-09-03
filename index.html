@@ -70,7 +70,19 @@
             </form>
         </div>
 
-        <div id="home-content" class="space-y-6">
+        <div id="username-form-container" class="hidden">
+            <form id="username-form" class="bg-white p-6 rounded-xl shadow-lg w-full mx-auto text-center">
+                <h2 class="text-xl font-bold mb-4 text-gray-800">Choose a Username</h2>
+                <p class="text-gray-600 mb-6">This will be your unique identifier on the platform.</p>
+                <div class="mb-4">
+                    <label for="username-input" class="sr-only">Username</label>
+                    <input type="text" id="username-input" class="w-full p-3 border rounded-xl bg-gray-50 text-center focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter a unique username">
+                </div>
+                <button type="submit" class="ripple-button w-full bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Save Username</button>
+            </form>
+        </div>
+
+        <div id="home-content" class="hidden space-y-6">
             <p id="loading-message" class="text-center text-gray-500 mt-10">Loading posts...</p>
             <div id="posts-container"></div>
         </div>
@@ -182,6 +194,9 @@
     const bottomBarEl = document.getElementById('bottom-bar');
     const navHomeBtn = document.getElementById('nav-home');
     const navProfileBtn = document.getElementById('nav-profile');
+    const usernameFormContainerEl = document.getElementById('username-form-container');
+    const usernameFormEl = document.getElementById('username-form');
+    const usernameInput = document.getElementById('username-input');
 
     // --- State variables ---
     let user = null;
@@ -257,14 +272,25 @@
         homeContentEl.classList.add('hidden');
         profileContentEl.classList.add('hidden');
         postFormContainerEl.classList.add('hidden');
+        usernameFormContainerEl.classList.add('hidden');
         authUiEl.innerHTML = '';
         bottomBarEl.classList.add('hidden');
 
-        if (viewingProfileUsername) {
+        if (user && !user.username) {
+            renderUsernameForm();
+        } else if (viewingProfileUsername) {
             renderProfilePage();
         } else {
             renderHomePage();
         }
+    };
+
+    const renderUsernameForm = () => {
+        usernameFormContainerEl.classList.remove('hidden');
+        authUiEl.innerHTML = `
+            <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
+        `;
+        document.getElementById('sign-out-btn').onclick = handleSignOut;
     };
 
     const renderHomePage = () => {
@@ -445,7 +471,7 @@
                 </div>
                 <div class="mt-4">
                     <h3 class="text-lg font-semibold text-gray-800">Comments</h3>
-                    ${user && !sharedPostId ? `
+                    ${user ? `
                         <form class="comment-form mt-2 flex" data-post-id="${post.id}">
                             <input type="text" name="comment" class="flex-1 p-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Add a comment...">
                             <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Comment</button>
@@ -465,23 +491,7 @@
     const handleGoogleSignIn = async () => {
         try {
             const provider = new GoogleAuthProvider();
-            const result = await signInWithPopup(auth, provider);
-            const currentUser = result.user;
-
-            const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
-            const userSnap = await getDoc(userRef);
-
-            if (!userSnap.exists()) {
-                const username = currentUser.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-                await setDoc(userRef, {
-                    uid: currentUser.uid,
-                    displayName: currentUser.displayName,
-                    username,
-                    bio: '',
-                    isBanned: false,
-                    createdAt: new Date(),
-                });
-            }
+            await signInWithPopup(auth, provider);
         } catch (error) {
             console.error("Google Sign-In Error:", error);
             showModal('Failed to sign in with Google. Check the console for details.');
@@ -496,6 +506,34 @@
     };
     
     // --- Profile Handlers ---
+    const handleUsernameSubmit = async (e) => {
+        e.preventDefault();
+        const newUsername = usernameInput.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+
+        if (!newUsername) {
+            showModal('Username cannot be empty.');
+            return;
+        }
+
+        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+        const usernameQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where("username", "==", newUsername));
+        const usernameSnapshot = await getDocs(usernameQuery);
+        
+        if (!usernameSnapshot.empty) {
+            showModal('This username is already taken. Please choose another.');
+            return;
+        }
+
+        await updateDoc(userRef, {
+            username: newUsername,
+            lastUsernameChange: new Date()
+        });
+        
+        user.username = newUsername;
+        showModal('Username saved successfully!');
+        navigateToHome();
+    };
+
     const handleEditProfile = () => {
         editProfileFormContainerEl.classList.remove('hidden');
         profileContentEl.querySelector('.bg-white').classList.add('hidden');
@@ -690,8 +728,8 @@
     const setupFirestoreListeners = () => {
         unsubscribeAll();
         
-        if (viewingProfileUsername) {
-            // No live post updates on profile page
+        if (viewingProfileUsername || (user && !user.username)) {
+            // No live post updates on profile page or username form
             return;
         }
 
@@ -759,6 +797,7 @@
         handleShareLinkAndProfile();
         modalOkBtn.onclick = closeModal;
         postFormEl.onsubmit = handlePostSubmit;
+        usernameFormEl.onsubmit = handleUsernameSubmit;
         editProfileFormEl.onsubmit = handleEditProfileSubmit;
         editProfileBtn.onclick = handleEditProfile;
         navHomeBtn.onclick = navigateToHome;
@@ -818,7 +857,16 @@
                     if (userSnap.exists()) {
                         user = { ...currentUser, ...userSnap.data() };
                     } else {
-                         user = currentUser;
+                        // Create a basic user profile for new sign-ins
+                        await setDoc(userDocRef, {
+                            uid: currentUser.uid,
+                            displayName: currentUser.displayName,
+                            username: null, // Set to null to trigger username creation form
+                            bio: '',
+                            isBanned: false,
+                            createdAt: new Date(),
+                        });
+                        user = { ...currentUser, username: null };
                     }
                 }
             } else {
