@@ -116,6 +116,7 @@
                     <button type="submit" class="ripple-button w-full bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Save Changes</button>
                 </form>
             </div>
+            <div id="profile-posts-container" class="mt-6 space-y-6"></div>
         </div>
 
     </div>
@@ -149,7 +150,7 @@
  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
     
     // User's provided Firebase configuration
@@ -191,6 +192,7 @@
     const profileDisplayNameEl = document.getElementById('profile-displayname');
     const profileUsernameEl = document.getElementById('profile-username');
     const profileBioEl = document.getElementById('profile-bio');
+    const profilePostsContainerEl = document.getElementById('profile-posts-container');
     const bottomBarEl = document.getElementById('bottom-bar');
     const navHomeBtn = document.getElementById('nav-home');
     const navProfileBtn = document.getElementById('nav-profile');
@@ -205,6 +207,7 @@
     let sharedPostId = null;
     let viewingProfileUsername = null;
     let postUnsubscribe = null;
+    let profilePostsUnsubscribe = null;
     let commentUnsubscribes = {};
 
     // --- Utility Functions ---
@@ -316,7 +319,7 @@
 
         if (isAuthReady) {
             loadingMessageEl.classList.add('hidden');
-            renderPosts();
+            renderPosts(posts, postsContainerEl);
         }
     };
 
@@ -335,17 +338,24 @@
         }
         
         if (profileUser) {
-            profileDisplayNameEl.textContent = profileUser.displayName || 'Unnamed User';
-            profileUsernameEl.textContent = `@${profileUser.username}`;
-            profileBioEl.textContent = profileUser.bio || 'No bio yet.';
-            
-            if (user && user.uid === profileUser.uid) {
-                editProfileBtn.classList.remove('hidden');
+            if (profileUser.isBanned) {
+                profileDisplayNameEl.textContent = 'User';
+                profileUsernameEl.textContent = `@${profileUser.username}`;
+                profileBioEl.innerHTML = `<h3 class="text-3xl font-bold text-red-600 mt-10">Account Banned</h3><p class="text-gray-500 mt-2">This account is no longer available</p>`;
+                profilePostsContainerEl.innerHTML = '';
+            } else {
+                profileDisplayNameEl.textContent = profileUser.displayName || 'Unnamed User';
+                profileUsernameEl.textContent = `@${profileUser.username}`;
+                profileBioEl.textContent = profileUser.bio || 'No bio yet.';
+                if (user && user.uid === profileUser.uid) {
+                    editProfileBtn.classList.remove('hidden');
+                }
             }
         } else {
             profileDisplayNameEl.textContent = 'User Not Found';
             profileUsernameEl.textContent = '';
             profileBioEl.textContent = 'The profile you are looking for does not exist.';
+            profilePostsContainerEl.innerHTML = '';
         }
 
         if (user) {
@@ -363,14 +373,14 @@
         }
     };
 
-    const renderPosts = () => {
-        postsContainerEl.innerHTML = '';
-        if (posts.length === 0) {
-            postsContainerEl.innerHTML = `<p class="text-center text-gray-500 mt-10">No posts yet. Be the first to post!</p>`;
+    const renderPosts = (postList, container) => {
+        container.innerHTML = '';
+        if (postList.length === 0) {
+            container.innerHTML = `<p class="text-center text-gray-500 mt-10">No posts yet.</p>`;
             return;
         }
 
-        posts.forEach(post => {
+        postList.forEach(post => {
             const postEl = document.createElement('div');
             postEl.className = 'bg-white p-6 rounded-xl shadow-lg mb-6';
             postEl.setAttribute('data-post-id', post.id);
@@ -483,7 +493,7 @@
                 </div>
             `;
             postEl.innerHTML = postHtml;
-            postsContainerEl.appendChild(postEl);
+            container.appendChild(postEl);
         });
     };
 
@@ -515,7 +525,6 @@
             return;
         }
 
-        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
         const usernameQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where("username", "==", newUsername));
         const usernameSnapshot = await getDocs(usernameQuery);
         
@@ -524,9 +533,10 @@
             return;
         }
 
+        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
         await updateDoc(userRef, {
             username: newUsername,
-            lastUsernameChange: new Date()
+            lastUsernameChange: serverTimestamp()
         });
         
         user.username = newUsername;
@@ -568,13 +578,13 @@
 
             const usernameQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where("username", "==", newUsername));
             const usernameSnapshot = await getDocs(usernameQuery);
-            if (!usernameSnapshot.empty) {
+            if (!usernameSnapshot.empty && usernameSnapshot.docs[0].id !== user.uid) {
                 showModal('This username is already taken. Please choose another.');
                 return;
             }
             await updateDoc(userRef, {
                 username: newUsername,
-                lastUsernameChange: now,
+                lastUsernameChange: serverTimestamp(),
             });
         }
         
@@ -603,7 +613,7 @@
             authorDisplayName: user.displayName || 'Anonymous',
             authorUsername: user.username || 'unknown',
             content: postContentInputEl.value.trim(),
-            createdAt: new Date(),
+            createdAt: serverTimestamp(),
             likes: 0,
             dislikes: 0,
             likers: [],
@@ -615,7 +625,12 @@
     const handlePostDelete = async (postId) => {
         if (!user) return;
         const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
-        await deleteDoc(postRef);
+        const postSnap = await getDoc(postRef);
+        if (postSnap.exists() && postSnap.data().userId === user.uid) {
+            await deleteDoc(postRef);
+        } else {
+            showModal('You are not authorized to delete this post.');
+        }
     };
 
     const handleCommentSubmit = async (e) => {
@@ -634,7 +649,7 @@
             authorDisplayName: user.displayName || 'Anonymous',
             authorUsername: user.username || 'unknown',
             content,
-            createdAt: new Date(),
+            createdAt: serverTimestamp(),
             likes: 0,
             dislikes: 0,
             likers: [],
@@ -647,7 +662,12 @@
     const handleCommentDelete = async (postId, commentId) => {
         if (!user) return;
         const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
-        await deleteDoc(commentRef);
+        const commentSnap = await getDoc(commentRef);
+        if (commentSnap.exists() && commentSnap.data().userId === user.uid) {
+            await deleteDoc(commentRef);
+        } else {
+            showModal('You are not authorized to delete this comment.');
+        }
     };
 
     // --- Like/Dislike Handlers ---
@@ -717,6 +737,10 @@
             postUnsubscribe();
             postUnsubscribe = null;
         }
+        if (profilePostsUnsubscribe) {
+            profilePostsUnsubscribe();
+            profilePostsUnsubscribe = null;
+        }
         for (const postId in commentUnsubscribes) {
             if (commentUnsubscribes[postId]) {
                 commentUnsubscribes[postId]();
@@ -728,12 +752,49 @@
     const setupFirestoreListeners = () => {
         unsubscribeAll();
         
-        if (viewingProfileUsername || (user && !user.username)) {
-            // No live post updates on profile page or username form
+        if (user && !user.username) {
+            // No live updates on username form
             return;
         }
 
-        if (sharedPostId) {
+        if (viewingProfileUsername) {
+            const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
+            const userQuery = query(usersRef, where("username", "==", viewingProfileUsername));
+            getDocs(userQuery).then(userSnapshot => {
+                if (!userSnapshot.empty) {
+                    const profileUserId = userSnapshot.docs[0].id;
+                    const profileUserData = userSnapshot.docs[0].data();
+
+                    if (profileUserData.isBanned) {
+                        return; // Stop listening to posts if user is banned
+                    }
+                    
+                    const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+                    const postsQuery = query(postsRef, where("userId", "==", profileUserId));
+                    profilePostsUnsubscribe = onSnapshot(postsQuery, async (postsSnapshot) => {
+                        let profilePosts = postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), comments: [] }));
+                        profilePosts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+
+                        for (const post of profilePosts) {
+                            const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
+                            const commentSnapshot = await getDocs(commentsRef);
+                            const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
+                            const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                            sortedComments.forEach(comment => {
+                                comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                            });
+                            post.comments = sortedComments;
+                        }
+                        renderPosts(profilePosts, profilePostsContainerEl);
+                    });
+                } else {
+                    renderPosts([], profilePostsContainerEl);
+                }
+            }).catch(error => {
+                console.error("Error fetching profile user data:", error);
+            });
+            
+        } else if (sharedPostId) {
             const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, sharedPostId);
             postUnsubscribe = onSnapshot(postRef, async (postSnapshot) => {
                 if (postSnapshot.exists()) {
@@ -751,7 +812,7 @@
 
                     postData.comments = sortedComments;
                     posts = [postData];
-                    renderPosts();
+                    renderPosts(posts, postsContainerEl);
                 } else {
                     postsContainerEl.innerHTML = `<p class="text-center text-red-500 mt-10">Post not found.</p>`;
                 }
@@ -784,10 +845,10 @@
                         if (postIndex !== -1) {
                             posts[postIndex].comments = sortedComments;
                         }
-                        renderPosts();
+                        renderPosts(posts, postsContainerEl);
                     });
                 });
-                renderPosts();
+                renderPosts(posts, postsContainerEl);
             });
         }
     };
@@ -813,7 +874,7 @@
             setupFirestoreListeners();
         };
 
-        postsContainerEl.addEventListener('click', (e) => {
+        document.addEventListener('click', (e) => {
             const target = e.target.closest('button, a');
             if (!target) return;
 
@@ -837,7 +898,7 @@
             }
         });
 
-        postsContainerEl.addEventListener('submit', (e) => {
+        document.addEventListener('submit', (e) => {
             const form = e.target.closest('form');
             if ((form && form.classList.contains('comment-form')) || form.classList.contains('comment-reply-form')) {
                 handleCommentSubmit(e);
@@ -864,7 +925,7 @@
                             username: null, // Set to null to trigger username creation form
                             bio: '',
                             isBanned: false,
-                            createdAt: new Date(),
+                            createdAt: serverTimestamp(),
                         });
                         user = { ...currentUser, username: null };
                     }
