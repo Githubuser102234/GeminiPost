@@ -517,6 +517,7 @@
                         ${renderComments(post.comments)}
                     </div>
                 </div>
+                ${sharedPostId ? `<p class="text-center text-gray-500 mt-4">Viewing Shared Post • <a href="javascript:void(0)" id="go-home-link" class="text-blue-600 hover:underline">Go Home</a></p>` : ''}
             `;
             postEl.innerHTML = postHtml;
             container.appendChild(postEl);
@@ -834,19 +835,18 @@
                     }
 
                     const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postData.id}/comments`);
-                    const commentsQuery = query(commentsRef);
-                    
-                    const commentSnapshot = await getDocs(commentsQuery);
-                    const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
+                    commentUnsubscribes[postData.id] = onSnapshot(commentsRef, (commentSnapshot) => {
+                        const commentsData = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
 
-                    const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                    sortedComments.forEach(comment => {
-                        comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        const sortedComments = commentsData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        sortedComments.forEach(comment => {
+                            comment.replies = commentsData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                        });
+                        
+                        postData.comments = sortedComments;
+                        posts = [postData];
+                        renderPosts(posts, postsContainerEl);
                     });
-
-                    postData.comments = sortedComments;
-                    posts = [postData];
-                    renderPosts(posts, postsContainerEl);
                 } else {
                     postsContainerEl.innerHTML = `<p class="text-center text-red-500 mt-10">Post not found.</p>`;
                 }
@@ -913,12 +913,6 @@
             }
         };
         
-        window.onpopstate = () => {
-            handleShareLinkAndProfile();
-            renderUI();
-            setupFirestoreListeners();
-        };
-
         document.addEventListener('click', (e) => {
             const target = e.target.closest('button, a');
             if (!target) return;
@@ -926,7 +920,10 @@
             const postId = target.getAttribute('data-post-id');
             const commentId = target.getAttribute('data-comment-id');
 
-            if (target.classList.contains('delete-post-btn')) {
+            if (target.id === 'go-home-link') {
+                e.preventDefault();
+                navigateToHome();
+            } else if (target.classList.contains('delete-post-btn')) {
                 handlePostDelete(postId);
             } else if (target.classList.contains('delete-comment-btn')) {
                 handleCommentDelete(postId, commentId);
