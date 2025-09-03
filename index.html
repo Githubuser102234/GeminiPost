@@ -344,7 +344,14 @@
         postMediaInputEl.value = '';
         postMediaFilenameEl.textContent = '';
     };
-
+    
+    // Helper function to extract path from a Supabase public URL
+    const getPathFromSupabaseUrl = (url, bucket) => {
+        if (!url || !url.includes(SUPABASE_URL)) return null;
+        const basePath = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/`;
+        return url.replace(basePath, '');
+    };
+    
     // --- Media Uploads ---
     const uploadFile = async (bucket, path, file) => {
         try {
@@ -359,6 +366,17 @@
         }
     };
     
+    const deleteFile = async (bucket, path) => {
+        if (!path) return;
+        try {
+            const { data, error } = await supabase.storage.from(bucket).remove([path]);
+            if (error) throw error;
+            console.log("File deleted from Supabase:", data);
+        } catch (error) {
+            console.error('File deletion error:', error);
+        }
+    };
+
     const getProfilePicUrl = (profileUrl, isBanned) => {
         if (isBanned || !profileUrl) {
             return 'https://placehold.co/128x128/bdbdbd/ffffff?text=U';
@@ -719,11 +737,20 @@
         const file = e.target.files[0];
         if (!file) return;
         
+        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.data();
+
+        // Delete old profile picture if it exists and is from Supabase
+        if (userData.photoURL && userData.photoURL.includes(SUPABASE_URL)) {
+            const oldPath = getPathFromSupabaseUrl(userData.photoURL, 'profiles');
+            await deleteFile('profiles', oldPath);
+        }
+        
         const filePath = `${user.uid}/${Date.now()}-${file.name}`;
         const photoURL = await uploadFile('profiles', filePath, file);
         
         if (photoURL) {
-            const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
             await updateDoc(userRef, { photoURL });
             user.photoURL = photoURL;
             profilePicDisplayEl.src = photoURL;
@@ -857,6 +884,11 @@
         const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
         const postSnap = await getDoc(postRef);
         if (postSnap.exists() && postSnap.data().userId === user.uid) {
+            const postData = postSnap.data();
+            if (postData.mediaUrl) {
+                const mediaPath = getPathFromSupabaseUrl(postData.mediaUrl, 'media');
+                await deleteFile('media', mediaPath);
+            }
             await deleteDoc(postRef);
         } else {
             showModal('You are not authorized to delete this post.');
@@ -909,6 +941,11 @@
         const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
         const commentSnap = await getDoc(commentRef);
         if (commentSnap.exists() && commentSnap.data().userId === user.uid) {
+            const commentData = commentSnap.data();
+            if (commentData.mediaUrl) {
+                 const mediaPath = getPathFromSupabaseUrl(commentData.mediaUrl, 'media');
+                 await deleteFile('media', mediaPath);
+            }
             await deleteDoc(commentRef);
         } else {
             showModal('You are not authorized to delete this comment.');
@@ -1156,7 +1193,7 @@
             }
         });
 
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', async (e) => {
             const target = e.target.closest('button, a');
             if (!target) return;
 
@@ -1167,54 +1204,58 @@
                 e.preventDefault();
                 navigateToHome();
             } else if (target.classList.contains('delete-post-btn')) {
-                handlePostDelete(postId);
+                await handlePostDelete(postId);
             } else if (target.classList.contains('delete-comment-btn')) {
-                handleCommentDelete(postId, commentId);
+                await handleCommentDelete(postId, commentId);
             } else if (target.classList.contains('like-post-btn')) {
-                handleVote('post', postId, 'like');
+                await handleVote('post', postId, 'like');
             } else if (target.classList.contains('dislike-post-btn')) {
-                handleVote('post', postId, 'dislike');
+                await handleVote('post', postId, 'dislike');
             } else if (target.classList.contains('like-comment-btn')) {
-                handleVote('comment', commentId, 'like', postId);
+                await handleVote('comment', commentId, 'like', postId);
             } else if (target.classList.contains('dislike-comment-btn')) {
-                handleVote('comment', commentId, 'dislike', postId);
+                await handleVote('comment', commentId, 'dislike', postId);
             } else if (target.classList.contains('share-post-btn')) {
                 copyShareLink(postId);
             }
         });
 
-        document.addEventListener('submit', (e) => {
+        document.addEventListener('submit', async (e) => {
             const form = e.target.closest('form');
             if (form && (form.classList.contains('comment-form') || form.classList.contains('comment-reply-form'))) {
                 e.preventDefault();
-                handleCommentSubmit(e);
+                await handleCommentSubmit(e);
             }
         });
 
         onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
-                const isBanned = await isUserBanned(currentUser.uid);
-                if (isBanned) {
+                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+                const userSnap = await getDoc(userDocRef);
+
+                let userData = null;
+                if (userSnap.exists()) {
+                    userData = userSnap.data();
+                } else {
+                    const initialData = {
+                        uid: currentUser.uid,
+                        displayName: currentUser.displayName,
+                        username: null,
+                        bio: '',
+                        isBanned: false,
+                        createdAt: serverTimestamp(),
+                        photoURL: currentUser.photoURL,
+                    };
+                    await setDoc(userDocRef, initialData);
+                    userData = initialData;
+                }
+
+                if (userData.isBanned) {
                     await signOut(auth);
                     showModal('Your account has been banned. You have been signed out.');
                     user = null;
                 } else {
-                    const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
-                    const userSnap = await getDoc(userDocRef);
-                    if (userSnap.exists()) {
-                        user = { ...currentUser, ...userSnap.data() };
-                    } else {
-                        await setDoc(userDocRef, {
-                            uid: currentUser.uid,
-                            displayName: currentUser.displayName,
-                            username: null,
-                            bio: '',
-                            isBanned: false,
-                            createdAt: serverTimestamp(),
-                            photoURL: currentUser.photoURL,
-                        });
-                        user = { ...currentUser, username: null, photoURL: currentUser.photoURL };
-                    }
+                    user = { ...currentUser, ...userData };
                 }
             } else {
                 user = null;
