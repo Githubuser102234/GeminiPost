@@ -64,6 +64,68 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .lightbox-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .lightbox-container.active {
+            display: flex;
+        }
+        .lightbox-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            display: flex;
+            align-items: center;
+        }
+        .lightbox-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1001;
+        }
+        .lightbox-prev, .lightbox-next {
+            cursor: pointer;
+            position: absolute;
+            top: 50%;
+            width: auto;
+            padding: 16px;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            transition: 0.6s ease;
+            border-radius: 0 3px 3px 0;
+            user-select: none;
+        }
+        .lightbox-prev {
+            left: 0;
+            border-radius: 3px 0 0 3px;
+        }
+        .lightbox-next {
+            right: 0;
+            border-radius: 3px 0 0 3px;
+        }
+        .lightbox-prev:hover, .lightbox-next:hover {
+            background-color: rgba(0,0,0,0.8);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
@@ -90,12 +152,10 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
                             </svg>
-                            <input type="file" id="post-media-input" accept="image/*,video/*" multiple class="hidden">
+                            <input type="file" id="post-media-input" accept="image/*,video/*" class="hidden">
                         </label>
                         <span id="post-media-filename" class="text-sm text-gray-500 truncate max-w-[calc(100%-6rem)]"></span>
                     </div>
-
-                    <div id="media-previews" class="mt-4 grid grid-cols-4 gap-2"></div>
 
                     <button type="submit" id="post-submit-btn" class="ripple-button w-full mt-4 bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center" disabled>
                         Post
@@ -136,13 +196,7 @@
                     <h2 id="profile-displayname" class="text-3xl font-bold text-gray-800 mb-2"></h2>
                     <p id="profile-username" class="text-lg text-gray-500 mb-4"></p>
                     <p id="profile-bio" class="text-gray-700 mb-6 max-w-lg"></p>
-                    <div class="flex items-center space-x-4">
-                         <button id="edit-profile-btn" class="hidden ripple-button px-6 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Edit Profile</button>
-                         <button id="share-profile-btn" class="hidden ripple-button flex items-center px-4 py-2 text-blue-600 hover:text-blue-700">
-                             <img src="https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/share.png" class="h-6 w-6" alt="Share">
-                             <span class="ml-1 text-base">Share Profile</span>
-                         </button>
-                    </div>
+                    <button id="edit-profile-btn" class="hidden ripple-button px-6 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Edit Profile</button>
                 </div>
             </div>
             
@@ -210,8 +264,16 @@
             </a>
         </div>
     </div>
-
- <script type="module">
+    
+    <div id="lightbox" class="lightbox-container">
+        <span id="lightbox-close" class="lightbox-close">&times;</span>
+        <div class="lightbox-content">
+            <img id="lightbox-image" class="lightbox-image" src="" alt="Full image">
+            <a id="lightbox-prev" class="lightbox-prev" style="display:none;">&#10094;</a>
+            <a id="lightbox-next" class="lightbox-next" style="display:none;">&#10095;</a>
+        </div>
+    </div>
+    <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
     import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc, serverTimestamp, writeBatch, collectionGroup } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
@@ -247,7 +309,7 @@
     const postFormEl = document.getElementById('post-form');
     const postContentInputEl = document.getElementById('post-content-input');
     const postMediaInputEl = document.getElementById('post-media-input');
-    const mediaPreviewsEl = document.getElementById('media-previews');
+    const postMediaFilenameEl = document.getElementById('post-media-filename');
     const postSubmitBtn = document.getElementById('post-submit-btn');
     const closePostFormBtn = document.getElementById('close-post-form');
     const postsContainerEl = document.getElementById('posts-container');
@@ -261,7 +323,6 @@
     const confirmActionBtn = document.getElementById('confirm-action-btn');
     const homeContentEl = document.getElementById('home-content');
     const profileContentEl = document.getElementById('profile-content');
-    const shareProfileBtn = document.getElementById('share-profile-btn');
     const editProfileBtn = document.getElementById('edit-profile-btn');
     const editProfileFormContainerEl = document.getElementById('edit-profile-form-container');
     const editProfileFormEl = document.getElementById('edit-profile-form');
@@ -282,6 +343,11 @@
     const usernameFormContainerEl = document.getElementById('username-form-container');
     const usernameFormEl = document.getElementById('username-form');
     const usernameInput = document.getElementById('username-input');
+    const lightboxEl = document.getElementById('lightbox');
+    const lightboxImageEl = document.getElementById('lightbox-image');
+    const lightboxCloseBtn = document.getElementById('lightbox-close');
+    const lightboxPrevBtn = document.getElementById('lightbox-prev');
+    const lightboxNextBtn = document.getElementById('lightbox-next');
 
     // --- State variables ---
     let user = null;
@@ -292,12 +358,13 @@
     let postUnsubscribe = null;
     let profilePostsUnsubscribe = null;
     let commentUnsubscribes = {};
-    let postMediaFiles = [];
+    let postMediaFile = null;
     let currentPostIdToDelete = null;
+    let currentLightboxImages = [];
+    let currentLightboxIndex = 0;
     
     // This Map will store the media file for a specific comment form
     const commentMediaFiles = new Map(); 
-    let usersMap = new Map();
 
     // --- Utility Functions ---
     const showModal = (message) => {
@@ -332,6 +399,18 @@
         return date.toLocaleString();
     };
 
+    const isUserBanned = async (userId) => {
+        if (!db) return false;
+        try {
+            const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            const userSnap = await getDoc(userRef);
+            return userSnap.exists() && userSnap.data().isBanned === true;
+        } catch (error) {
+            console.error("Error checking ban status:", error);
+            return false;
+        }
+    };
+    
     const getUserDataFromUsername = async (username) => {
         const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
         const q = query(usersRef, where("username", "==", username));
@@ -356,14 +435,6 @@
             .catch(err => console.error('Failed to copy link: ', err));
     };
 
-    const copyProfileLink = (username) => {
-        const baseUrl = window.location.href.split('?')[0];
-        const shareUrl = `${baseUrl}?profile=${encodeURIComponent(username)}`;
-        navigator.clipboard.writeText(shareUrl)
-            .then(() => showModal('Profile link copied to clipboard!'))
-            .catch(err => console.error('Failed to copy link: ', err));
-    };
-
     const navigateToHome = () => {
         window.history.pushState({}, '', window.location.pathname);
         sharedPostId = null;
@@ -382,12 +453,10 @@
     };
     
     const showPostForm = () => {
-        if (user && user.username && !user.isBanned) {
+        if (user && user.username) {
             postFormContainerEl.classList.remove('hidden');
             postContentInputEl.focus();
-            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && postMediaFiles.length === 0;
-        } else if (user && user.isBanned) {
-            showModal('You cannot create a post because your account is banned.');
+            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0;
         } else if (user && !user.username) {
             showModal('Please choose a username before posting.');
         } else {
@@ -397,10 +466,10 @@
     
     const hidePostForm = () => {
         postFormContainerEl.classList.add('hidden');
-        postMediaFiles = [];
+        postMediaFile = null;
         postContentInputEl.value = '';
         postMediaInputEl.value = '';
-        mediaPreviewsEl.innerHTML = '';
+        postMediaFilenameEl.textContent = '';
         postSubmitBtn.disabled = true;
     };
     
@@ -436,50 +505,6 @@
         }
     };
 
-    const resizeImage = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    const max_size = 1024; // Maximum width or height
-                    if (width > height) {
-                        if (width > max_size) {
-                            height *= max_size / width;
-                            width = max_size;
-                        }
-                    } else {
-                        if (height > max_size) {
-                            width *= max_size / height;
-                            height = max_size;
-                        }
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                    canvas.toBlob((blob) => {
-                        resolve(blob);
-                    }, file.type, 0.8);
-                };
-                img.src = event.target.result;
-            };
-            reader.onerror = (error) => reject(error);
-            reader.readAsDataURL(file);
-        });
-    };
-
-    const renderMedia = (mediaUrl) => {
-        if (!mediaUrl) return '';
-        if (mediaUrl.match(/\.(mp4|mov|avi|wmv|mkv)$/i)) {
-            return `<video controls src="${mediaUrl}" class="w-full rounded-xl mt-2"></video>`;
-        } else {
-            return `<img src="${mediaUrl}" class="w-full rounded-xl object-cover mt-2">`;
-        }
-    };
-
     const getProfilePicUrl = (profileUrl, isBanned) => {
         if (isBanned || !profileUrl) {
             return 'https://placehold.co/128x128/bdbdbd/ffffff?text=U';
@@ -487,33 +512,48 @@
         return profileUrl;
     };
 
-    const renderPostMedia = (mediaUrls) => {
-        if (!mediaUrls || mediaUrls.length === 0) return '';
-    
-        const numImages = mediaUrls.length;
-        const imagesToDisplay = numImages > 2 ? mediaUrls.slice(0, 2) : mediaUrls;
-    
-        let imagesHtml = imagesToDisplay.map((url, index) => {
-            return `<img src="${url}" class="w-full h-32 object-cover rounded-xl ${numImages > 1 ? 'w-1/2' : ''}" alt="Post media">`;
-        }).join('');
-    
-        let overflowHtml = '';
-        if (numImages > 2) {
-            overflowHtml = `
-                <div class="relative w-1/2 h-32">
-                    <img src="${mediaUrls[1]}" class="w-full h-32 object-cover rounded-xl" alt="Post media">
-                    <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white text-3xl font-bold rounded-xl">+${numImages - 1}</div>
-                </div>
-            `;
-            imagesHtml = `<img src="${mediaUrls[0]}" class="w-1/2 h-32 object-cover rounded-xl" alt="Post media">`;
+    const renderMedia = (mediaUrl, isComment = false) => {
+        if (!mediaUrl) return '';
+        if (mediaUrl.match(/\.(mp4|mov|avi|wmv|mkv)$/i)) {
+            const videoClass = isComment ? 'w-full rounded-xl mt-2' : 'w-full rounded-xl mt-2 object-cover';
+            return `<video controls src="${mediaUrl}" class="${videoClass}"></video>`;
+        } else {
+            const imageClass = isComment ? 'w-full rounded-xl mt-2' : 'w-full rounded-xl mt-2 object-cover cursor-pointer';
+            return `<img src="${mediaUrl}" class="${imageClass}" data-src="${mediaUrl}">`;
         }
-    
-        return `
-            <div class="mt-4 flex gap-2">
-                ${imagesHtml}
-                ${overflowHtml}
-            </div>
-        `;
+    };
+
+    // --- Lightbox Functions ---
+    const showLightbox = (mediaUrls, startIndex) => {
+        currentLightboxImages = Array.isArray(mediaUrls) ? mediaUrls : [mediaUrls];
+        currentLightboxIndex = startIndex;
+        updateLightboxImage();
+        lightboxEl.classList.add('active');
+    };
+
+    const hideLightbox = () => {
+        lightboxEl.classList.remove('active');
+        currentLightboxImages = [];
+        currentLightboxIndex = 0;
+    };
+
+    const updateLightboxImage = () => {
+        if (currentLightboxImages.length === 0) return;
+        lightboxImageEl.src = currentLightboxImages[currentLightboxIndex];
+        
+        // Show/hide navigation arrows
+        lightboxPrevBtn.style.display = currentLightboxImages.length > 1 ? 'block' : 'none';
+        lightboxNextBtn.style.display = currentLightboxImages.length > 1 ? 'block' : 'none';
+    };
+
+    const prevLightboxImage = () => {
+        currentLightboxIndex = (currentLightboxIndex - 1 + currentLightboxImages.length) % currentLightboxImages.length;
+        updateLightboxImage();
+    };
+
+    const nextLightboxImage = () => {
+        currentLightboxIndex = (currentLightboxIndex + 1) % currentLightboxImages.length;
+        updateLightboxImage();
     };
 
     // --- UI Rendering ---
@@ -537,23 +577,16 @@
 
     const renderUsernameForm = () => {
         usernameFormContainerEl.classList.remove('hidden');
-        if(user) {
-            authUiEl.innerHTML = `
-                <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
-            `;
-            document.getElementById('sign-out-btn').onclick = handleSignOut;
-        } else {
-             authUiEl.innerHTML = `
-                <button id="google-sign-in-btn" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700">Sign In with Google</button>
-            `;
-            document.getElementById('google-sign-in-btn').onclick = handleGoogleSignIn;
-        }
+        authUiEl.innerHTML = `
+            <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
+        `;
+        document.getElementById('sign-out-btn').onclick = handleSignOut;
     };
 
     const renderHomePage = () => {
         homeContentEl.classList.remove('hidden');
 
-        if (user && user.username) {
+        if (user) {
             authUiEl.innerHTML = `
                 <span class="font-medium text-gray-700">Hello, ${user.displayName || user.username || 'User'}!</span>
                 <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
@@ -576,23 +609,27 @@
     const renderProfilePage = async () => {
         profileContentEl.classList.remove('hidden');
         editProfileFormContainerEl.classList.add('hidden');
+        editProfileBtn.classList.add('hidden');
+        profilePicLabelEl.classList.add('hidden');
 
         const profileUser = await getUserDataFromUsername(viewingProfileUsername);
         
         if (profileUser) {
-            profileDisplayNameEl.textContent = profileUser.displayName || 'Unnamed User';
-            profileUsernameEl.textContent = `@${profileUser.username}`;
-            profileBioEl.textContent = profileUser.bio || 'No bio yet.';
-            profilePicDisplayEl.src = getProfilePicUrl(profileUser.photoURL, profileUser.isBanned);
-            shareProfileBtn.classList.remove('hidden');
-            shareProfileBtn.onclick = () => copyProfileLink(profileUser.username);
-
-            if (user && user.uid === profileUser.uid) {
-                editProfileBtn.classList.remove('hidden');
-                profilePicLabelEl.classList.remove('hidden');
+            if (profileUser.isBanned) {
+                profileDisplayNameEl.textContent = 'User';
+                profileUsernameEl.textContent = `@${profileUser.username}`;
+                profileBioEl.innerHTML = `<h3 class="text-3xl font-bold text-red-600 mt-10">Account Banned</h3><p class="text-gray-500 mt-2">This account is no longer available</p>`;
+                profilePostsContainerEl.innerHTML = '';
+                profilePicDisplayEl.src = getProfilePicUrl(profileUser.photoURL, true);
             } else {
-                editProfileBtn.classList.add('hidden');
-                profilePicLabelEl.classList.add('hidden');
+                profileDisplayNameEl.textContent = profileUser.displayName || 'Unnamed User';
+                profileUsernameEl.textContent = `@${profileUser.username}`;
+                profileBioEl.textContent = profileUser.bio || 'No bio yet.';
+                profilePicDisplayEl.src = getProfilePicUrl(profileUser.photoURL, false);
+                if (user && user.uid === profileUser.uid) {
+                    editProfileBtn.classList.remove('hidden');
+                    profilePicLabelEl.classList.remove('hidden');
+                }
             }
         } else {
             profileDisplayNameEl.textContent = 'User Not Found';
@@ -600,12 +637,9 @@
             profileBioEl.textContent = 'The profile you are looking for does not exist.';
             profilePostsContainerEl.innerHTML = '';
             profilePicDisplayEl.src = getProfilePicUrl(null, false);
-            shareProfileBtn.classList.add('hidden');
-            editProfileBtn.classList.add('hidden');
-            profilePicLabelEl.classList.add('hidden');
         }
 
-        if (user && user.username) {
+        if (user) {
             authUiEl.innerHTML = `
                 <span class="font-medium text-gray-700">Hello, ${user.displayName || user.username || 'User'}!</span>
                 <button id="sign-out-btn" class="ripple-button px-4 py-2 bg-red-500 text-white rounded-xl shadow-md hover:bg-red-600">Sign Out</button>
@@ -636,7 +670,7 @@
                 return commentList.map(comment => {
                     const isLikedByCurrentUser = user && comment.likers.includes(user.uid);
                     const isDislikedByCurrentUser = user && comment.dislikers.includes(user.uid);
-                    const commentProfilePicUrl = getProfilePicUrl(comment.authorPhotoURL, comment.isBanned);
+                    const commentProfilePicUrl = getProfilePicUrl(comment.authorPhotoURL, false);
 
                     const likeIcon = isLikedByCurrentUser
                         ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/like%202.png'
@@ -646,7 +680,7 @@
                         ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike%202.png'
                         : 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike.png';
                         
-                    const commentMediaHtml = renderMedia(comment.mediaUrl);
+                    const commentMediaHtml = renderMedia(comment.mediaUrl, true);
 
                     return `
                     <div class="mt-4 p-4 rounded-xl bg-gray-100 shadow-sm border border-gray-200">
@@ -683,29 +717,32 @@
                             <form class="comment-reply-form mt-2" data-post-id="${post.id}" data-parent-comment-id="${comment.id}">
                                 <div class="flex">
                                     <input type="text" name="comment-content" class="flex-1 p-2 text-sm border rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Reply...">
-                                    <button type="submit" class="reply-submit-btn ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600" disabled>Reply</button>
+                                    <button type="submit" class="ripple-button ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600">Reply</button>
                                 </div>
                                 <div class="mt-2 flex items-center space-x-4">
-                                     <label for="reply-media-input-${post.id}-${comment.id}" class="cursor-pointer">
+                                    <label for="reply-media-input-${comment.id}" class="cursor-pointer">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
                                         </svg>
-                                        <input type="file" id="reply-media-input-${post.id}-${comment.id}" accept="image/*,video/*" class="hidden" data-post-id="${post.id}" data-comment-id="${comment.id}">
+                                        <input type="file" id="reply-media-input-${comment.id}" accept="image/*,video/*" class="hidden" data-post-id="${post.id}" data-comment-id="${comment.id}">
                                     </label>
-                                    <span id="reply-media-filename-${post.id}-${comment.id}" class="text-xs text-gray-500 truncate max-w-[calc(100%-4rem)]"></span>
+                                    <span id="reply-media-filename-${comment.id}" class="text-xs text-gray-500 truncate max-w-[calc(100%-4rem)]"></span>
                                 </div>
                             </form>
                         ` : ''}
-                        <div class="pl-6 mt-4 border-l-2 border-gray-300 space-y-4">
-                            ${comment.replies && comment.replies.length > 0 ? renderComments(comment.replies) : ''}
+                        <div class="pl-6 mt-4 border-l-2 border-gray-200">
+                            ${comment.replies && comment.replies.length > 0 ? renderComments(comment.replies).join('') : ''}
                         </div>
                     </div>
-                `}).join('');
+                `;
+                }).join('');
             };
-            
+
+            const postProfilePicUrl = getProfilePicUrl(post.authorPhotoURL, post.isAuthorBanned);
+
+            const postMediaHtml = renderMedia(post.mediaUrl);
             const isLikedByCurrentUser = user && post.likers.includes(user.uid);
             const isDislikedByCurrentUser = user && post.dislikers.includes(user.uid);
-            const postProfilePicUrl = getProfilePicUrl(post.authorPhotoURL, post.isBanned);
 
             const likeIcon = isLikedByCurrentUser
                 ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/like%202.png'
@@ -715,809 +752,630 @@
                 ? 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike%202.png'
                 : 'https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/dislike.png';
 
-            const postMediaHtml = post.mediaUrls && post.mediaUrls.length > 0
-                ? renderPostMedia(post.mediaUrls)
-                : renderMedia(post.mediaUrl);
-
-            const postHtml = `
-                <div class="flex justify-between items-start mb-4">
-                    <div class="flex items-start flex-1">
-                        <div class="flex-shrink-0 mr-4">
-                             <img src="${postProfilePicUrl}" alt="Profile Picture" class="w-12 h-12 rounded-full object-cover">
+            postEl.innerHTML = `
+                <div class="flex items-start">
+                    <a href="?profile=${encodeURIComponent(post.authorUsername)}" class="flex-shrink-0 mr-4">
+                        <img src="${postProfilePicUrl}" alt="Profile Picture" class="w-12 h-12 rounded-full object-cover">
+                    </a>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <a href="?profile=${encodeURIComponent(post.authorUsername)}" class="font-bold text-gray-800 hover:underline">${post.authorDisplayName}</a>
+                                <span class="text-sm text-gray-500"> @${post.authorUsername}</span>
+                                <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
+                            </div>
+                            ${user && post.userId === user.uid ? `
+                                <div class="relative">
+                                    <button class="post-options-btn text-gray-500 hover:text-gray-700 ml-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                        </svg>
+                                    </button>
+                                    <div class="post-options-menu absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20 hidden">
+                                        <button class="delete-post-btn w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100" data-post-id="${post.id}">Delete</button>
+                                    </div>
+                                </div>
+                            ` : ''}
                         </div>
-                        <div>
-                            <a href="?profile=${encodeURIComponent(post.authorUsername)}" class="text-lg font-bold text-gray-800 hover:underline">${post.authorDisplayName}</a>
-                            <span class="text-sm text-gray-500"> @${post.authorUsername}</span>
-                            <p class="text-sm text-gray-500">${formatDate(post.createdAt)}</p>
-                            <p class="mt-2 text-gray-700">${post.content}</p>
-                        </div>
+                        <p class="mt-2 text-gray-700 whitespace-pre-wrap">${post.content}</p>
+                        ${postMediaHtml}
                     </div>
-                    ${user && post.userId === user.uid ? `
-                        <button class="delete-post-btn text-red-500 hover:text-red-700 ml-4" data-post-id="${post.id}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                    ` : ''}
                 </div>
-                ${postMediaHtml}
-                <div class="flex items-center space-x-6 mt-4">
+
+                <div class="flex items-center space-x-4 mt-4">
                     <button class="like-post-btn flex items-center ripple-button" data-post-id="${post.id}">
                         <img src="${likeIcon}" class="h-6 w-6" alt="Like">
-                        <span class="ml-1 text-base ${isLikedByCurrentUser ? 'text-green-600' : 'text-gray-600'}">${post.likes}</span>
+                        <span class="ml-1 text-sm ${isLikedByCurrentUser ? 'text-green-600' : 'text-gray-600'}">${post.likes}</span>
                     </button>
                     <button class="dislike-post-btn flex items-center ripple-button" data-post-id="${post.id}">
                         <img src="${dislikeIcon}" class="h-6 w-6" alt="Dislike">
-                        <span class="ml-1 text-base ${isDislikedByCurrentUser ? 'text-red-600' : 'text-gray-600'}">${post.dislikes}</span>
+                        <span class="ml-1 text-sm ${isDislikedByCurrentUser ? 'text-red-600' : 'text-gray-600'}">${post.dislikes}</span>
                     </button>
-                    <button class="share-post-btn flex items-center text-blue-600 hover:text-blue-700 ripple-button" data-post-id="${post.id}">
-                        <img src="https://raw.githubusercontent.com/Githubuser102234/GeminiPost/refs/heads/main/media/share.png" class="h-6 w-6" alt="Share">
-                        <span class="ml-1 text-base">Share</span>
+                    <button class="share-post-btn flex items-center ripple-button" data-post-id="${post.id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.883 12.56 9 11.82 9 11s-.117-1.56-.316-2.342m1.83 4.14C11.666 12.6 12 11.848 12 11s-.334-1.6-1.542-2.842m-5.83 4.14C4.334 12.6 4 11.848 4 11s.334-1.6 1.542-2.842m1.5-3.158c-.199-.782-.316-1.56-.316-2.342a3.5 3.5 0 017 0c0 .782-.117 1.56-.316 2.342M14 11a3 3 0 11-6 0 3 3 0 016 0zM12 14c-.117 0-.234-.02-.348-.058M5 11c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4-4 1.79-4 4zM4.684 13.342a7.5 7.5 0 00-.786 2.052C3.692 16.32 3 17.5 3 19s.692 2.68 1.488 3.558a7.5 7.5 0 00.786 2.052M19.316 13.342a7.5 7.5 0 01.786 2.052C20.308 16.32 21 17.5 21 19s-.692 2.68-1.488 3.558a7.5 7.5 0 01-.786 2.052M12 18a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="ml-1 text-sm text-gray-600">Share</span>
+                    </button>
+                    <button class="comment-toggle-btn flex items-center ripple-button" data-post-id="${post.id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span class="ml-1 text-sm text-gray-600">${post.commentsCount || 0}</span>
                     </button>
                 </div>
-                <div class="mt-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Comments</h3>
+
+                <div id="comments-${post.id}" class="comment-container mt-4">
                     ${user ? `
-                        <form class="comment-form mt-2" data-post-id="${post.id}">
-                            <div class="flex">
-                                <input type="text" name="comment-content" class="flex-1 p-2 border rounded-xl bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Add a comment...">
-                                <button type="submit" class="comment-submit-btn ripple-button ml-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700" disabled>Comment</button>
-                            </div>
-                            <div class="mt-2 flex items-center space-x-4">
+                        <form class="comment-form mt-4" data-post-id="${post.id}">
+                            <textarea name="comment-content" class="w-full p-3 border rounded-xl bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows="2" placeholder="Write a comment..."></textarea>
+                            <div class="mt-2 flex items-center justify-between">
                                 <label for="comment-media-input-${post.id}" class="cursor-pointer">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400 hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
                                     </svg>
                                     <input type="file" id="comment-media-input-${post.id}" accept="image/*,video/*" class="hidden" data-post-id="${post.id}">
                                 </label>
-                                <span id="comment-media-filename-${post.id}" class="text-sm text-gray-500 truncate max-w-[calc(100%-4rem)]"></span>
+                                <span id="comment-media-filename-${post.id}" class="text-xs text-gray-500 truncate ml-2 max-w-[calc(100%-4rem)]"></span>
+                                <button type="submit" class="ripple-button px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">Comment</button>
                             </div>
                         </form>
                     ` : ''}
-                    <div class="comments-list mt-4 space-y-4">
-                        ${renderComments(post.comments)}
+                    <div class="comments-list mt-4">
+                        ${post.comments && post.comments.length > 0 ? renderComments(post.comments).join('') : '<p class="text-center text-gray-500 text-sm">No comments yet.</p>'}
                     </div>
                 </div>
-                ${sharedPostId ? `<p class="text-center text-gray-500 mt-4">Viewing Shared Post • <a href="javascript:void(0)" id="go-home-link" class="text-blue-600 hover:underline">Go Home</a></p>` : ''}
             `;
-            postEl.innerHTML = postHtml;
             container.appendChild(postEl);
         });
+
+        // Add event listeners for lightbox functionality
+        document.querySelectorAll('img[data-src]').forEach(img => {
+            img.onclick = (e) => {
+                e.preventDefault();
+                const postEl = e.target.closest('[data-post-id]');
+                if (postEl) {
+                    // Assuming one image per post for now. Can be extended to an array.
+                    const mediaUrl = postEl.querySelector('img[data-src]').getAttribute('data-src');
+                    showLightbox([mediaUrl], 0);
+                }
+            };
+        });
+
+        lightboxCloseBtn.onclick = hideLightbox;
+        lightboxPrevBtn.onclick = prevLightboxImage;
+        lightboxNextBtn.onclick = nextLightboxImage;
     };
 
-    // --- Auth Handlers ---
-    const handleGoogleSignIn = async () => {
-        try {
-            const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            console.error("Google Sign-In Error:", error);
-            showModal('Failed to sign in with Google. Check the console for details.');
-        }
+    // --- Firebase/Auth/Firestore Logic ---
+    const handleGoogleSignIn = () => {
+        const provider = new GoogleAuthProvider();
+        signInWithPopup(auth, provider)
+            .catch((error) => {
+                console.error("Sign-in error: ", error);
+                showModal(`Sign-in failed: ${error.message}`);
+            });
     };
 
-    const handleSignOut = async () => {
-        await signOut(auth);
-        user = null;
-        navigateToHome();
-        showModal('You have been signed out.');
+    const handleSignOut = () => {
+        signOut(auth).catch((error) => {
+            console.error("Sign-out error: ", error);
+            showModal(`Sign-out failed: ${error.message}`);
+        });
     };
     
-    // --- Profile Handlers ---
-    const updateAllPostsAndComments = async (uid, newDisplayName, newUsername, newPhotoURL) => {
-        const batch = writeBatch(db);
+    const handlePostSubmit = async (e) => {
+        e.preventDefault();
+        const content = postContentInputEl.value.trim();
+        if (!content && !postMediaFile) {
+            showModal('Post content or media is required.');
+            return;
+        }
+        
+        showLoadingIndicator(postSubmitBtn, 'Posting...');
+        
+        try {
+            let mediaUrl = null;
+            if (postMediaFile) {
+                const mediaPath = `posts/media/${user.uid}/${Date.now()}_${postMediaFile.name}`;
+                mediaUrl = await uploadFile('media', mediaPath, postMediaFile);
+                if (!mediaUrl) throw new Error('Failed to upload media.');
+            }
 
-        // Update posts
-        const postsQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/posts`), where("userId", "==", uid));
-        const postsSnapshot = await getDocs(postsQuery);
-        postsSnapshot.forEach(docSnap => {
-            const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, docSnap.id);
-            const updateData = {};
-            if (newDisplayName) updateData.authorDisplayName = newDisplayName;
-            if (newUsername) updateData.authorUsername = newUsername;
-            if (newPhotoURL !== undefined) updateData.authorPhotoURL = newPhotoURL;
-            batch.update(postRef, updateData);
-        });
+            const newPost = {
+                content: content,
+                userId: user.uid,
+                authorDisplayName: user.displayName || user.username,
+                authorUsername: user.username,
+                authorPhotoURL: user.photoURL,
+                createdAt: serverTimestamp(),
+                mediaUrl: mediaUrl,
+                likes: 0,
+                dislikes: 0,
+                likers: [],
+                dislikers: [],
+            };
+            await addDoc(collection(db, `/artifacts/${APP_ID}/public/data/posts`), newPost);
+            
+            hidePostForm();
+            showModal('Post created successfully!');
+        } catch (error) {
+            console.error("Error adding document: ", error);
+            showModal(`Error creating post: ${error.message}`);
+        } finally {
+            hideLoadingIndicator(postSubmitBtn, 'Post');
+        }
+    };
+    
+    const handleCommentSubmit = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const postId = form.dataset.postId;
+        const parentCommentId = form.dataset.parentCommentId;
+        const content = form.querySelector('[name="comment-content"]').value.trim();
+        const mediaInputEl = form.querySelector('input[type="file"]');
+        const mediaFile = commentMediaFiles.get(postId) || commentMediaFiles.get(parentCommentId);
         
-        // Update comments
-        const commentsQuery = query(collectionGroup(db, 'comments'), where("userId", "==", uid));
-        const commentsSnapshot = await getDocs(commentsQuery);
-        commentsSnapshot.forEach(docSnap => {
-            const commentRef = doc(db, docSnap.ref.path);
-            const updateData = {};
-            if (newDisplayName) updateData.authorDisplayName = newDisplayName;
-            if (newUsername) updateData.authorUsername = newUsername;
-            if (newPhotoURL !== undefined) updateData.authorPhotoURL = newPhotoURL;
-            batch.update(commentRef, updateData);
-        });
+        if (!content && !mediaFile) {
+            showModal('Comment content or media is required.');
+            return;
+        }
         
-        await batch.commit();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        showLoadingIndicator(submitBtn, 'Commenting...');
+        
+        try {
+            let mediaUrl = null;
+            if (mediaFile) {
+                const mediaPath = `comments/media/${user.uid}/${Date.now()}_${mediaFile.name}`;
+                mediaUrl = await uploadFile('media', mediaPath, mediaFile);
+                if (!mediaUrl) throw new Error('Failed to upload media.');
+            }
+            
+            const newComment = {
+                content,
+                userId: user.uid,
+                authorDisplayName: user.displayName || user.username,
+                authorUsername: user.username,
+                authorPhotoURL: user.photoURL,
+                createdAt: serverTimestamp(),
+                postId: postId,
+                parentCommentId: parentCommentId || null,
+                likes: 0,
+                dislikes: 0,
+                likers: [],
+                dislikers: [],
+                mediaUrl: mediaUrl,
+            };
+            
+            await addDoc(collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`), newComment);
+            
+            form.reset();
+            commentMediaFiles.delete(postId);
+            commentMediaFiles.delete(parentCommentId);
+            if (mediaInputEl) {
+                const filenameEl = document.getElementById(`comment-media-filename-${postId}`) || document.getElementById(`reply-media-filename-${parentCommentId}`);
+                if (filenameEl) filenameEl.textContent = '';
+            }
+            
+        } catch (error) {
+            console.error("Error adding comment: ", error);
+            showModal(`Error commenting: ${error.message}`);
+        } finally {
+            hideLoadingIndicator(submitBtn, parentCommentId ? 'Reply' : 'Comment');
+        }
+    };
+    
+    const handleDeletePost = async (postId) => {
+        showConfirmationModal('Are you sure you want to delete this post and all its comments?', async () => {
+            try {
+                const batch = writeBatch(db);
+                const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+                const postSnap = await getDoc(postRef);
+
+                if (postSnap.exists() && postSnap.data().mediaUrl) {
+                    const mediaPath = getPathFromSupabaseUrl(postSnap.data().mediaUrl, 'media');
+                    if (mediaPath) {
+                         await deleteFile('media', mediaPath);
+                    }
+                }
+
+                // Delete all comments and their media files
+                const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`);
+                const commentsSnap = await getDocs(commentsRef);
+                const commentDeletions = commentsSnap.docs.map(async (commentDoc) => {
+                    const commentData = commentDoc.data();
+                    if (commentData.mediaUrl) {
+                        const mediaPath = getPathFromSupabaseUrl(commentData.mediaUrl, 'media');
+                        if (mediaPath) {
+                            await deleteFile('media', mediaPath);
+                        }
+                    }
+                    batch.delete(commentDoc.ref);
+                });
+                await Promise.all(commentDeletions);
+
+                batch.delete(postRef);
+                await batch.commit();
+                
+                confirmationModalEl.classList.add('hidden');
+                showModal('Post deleted successfully!');
+            } catch (error) {
+                console.error("Error deleting post: ", error);
+                confirmationModalEl.classList.add('hidden');
+                showModal(`Error deleting post: ${error.message}`);
+            }
+        });
+    };
+    
+    const handleDeleteComment = async (postId, commentId) => {
+        showConfirmationModal('Are you sure you want to delete this comment?', async () => {
+            try {
+                const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
+                const commentSnap = await getDoc(commentRef);
+                
+                if (commentSnap.exists() && commentSnap.data().mediaUrl) {
+                    const mediaPath = getPathFromSupabaseUrl(commentSnap.data().mediaUrl, 'media');
+                    if (mediaPath) {
+                        await deleteFile('media', mediaPath);
+                    }
+                }
+                
+                await deleteDoc(commentRef);
+                
+                confirmationModalEl.classList.add('hidden');
+                showModal('Comment deleted successfully!');
+            } catch (error) {
+                console.error("Error deleting comment: ", error);
+                confirmationModalEl.classList.add('hidden');
+                showModal(`Error deleting comment: ${error.message}`);
+            }
+        });
+    };
+    
+    const handleLikePost = async (postId) => {
+        if (!user) { showModal('Please sign in to like a post.'); return; }
+        const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+        const postSnap = await getDoc(postRef);
+        if (!postSnap.exists()) return;
+        
+        const postData = postSnap.data();
+        let newLikers = [...postData.likers];
+        let newDislikers = [...postData.dislikers];
+        
+        if (newLikers.includes(user.uid)) {
+            newLikers = newLikers.filter(uid => uid !== user.uid);
+        } else {
+            newLikers.push(user.uid);
+            newDislikers = newDislikers.filter(uid => uid !== user.uid);
+        }
+        
+        await updateDoc(postRef, {
+            likes: newLikers.length,
+            dislikes: newDislikers.length,
+            likers: newLikers,
+            dislikers: newDislikers
+        });
+    };
+    
+    const handleDislikePost = async (postId) => {
+        if (!user) { showModal('Please sign in to dislike a post.'); return; }
+        const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+        const postSnap = await getDoc(postRef);
+        if (!postSnap.exists()) return;
+        
+        const postData = postSnap.data();
+        let newLikers = [...postData.likers];
+        let newDislikers = [...postData.dislikers];
+
+        if (newDislikers.includes(user.uid)) {
+            newDislikers = newDislikers.filter(uid => uid !== user.uid);
+        } else {
+            newDislikers.push(user.uid);
+            newLikers = newLikers.filter(uid => uid !== user.uid);
+        }
+
+        await updateDoc(postRef, {
+            likes: newLikers.length,
+            dislikes: newDislikers.length,
+            likers: newLikers,
+            dislikers: newDislikers
+        });
+    };
+    
+    const handleLikeComment = async (postId, commentId) => {
+        if (!user) { showModal('Please sign in to like a comment.'); return; }
+        const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
+        const commentSnap = await getDoc(commentRef);
+        if (!commentSnap.exists()) return;
+        
+        const commentData = commentSnap.data();
+        let newLikers = [...commentData.likers];
+        let newDislikers = [...commentData.dislikers];
+        
+        if (newLikers.includes(user.uid)) {
+            newLikers = newLikers.filter(uid => uid !== user.uid);
+        } else {
+            newLikers.push(user.uid);
+            newDislikers = newDislikers.filter(uid => uid !== user.uid);
+        }
+        
+        await updateDoc(commentRef, {
+            likes: newLikers.length,
+            dislikes: newDislikers.length,
+            likers: newLikers,
+            dislikers: newDislikers
+        });
+    };
+    
+    const handleDislikeComment = async (postId, commentId) => {
+        if (!user) { showModal('Please sign in to dislike a comment.'); return; }
+        const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
+        const commentSnap = await getDoc(commentRef);
+        if (!commentSnap.exists()) return;
+        
+        const commentData = commentSnap.data();
+        let newLikers = [...commentData.likers];
+        let newDislikers = [...commentData.dislikers];
+
+        if (newDislikers.includes(user.uid)) {
+            newDislikers = newDislikers.filter(uid => uid !== user.uid);
+        } else {
+            newDislikers.push(user.uid);
+            newLikers = newLikers.filter(uid => uid !== user.uid);
+        }
+
+        await updateDoc(commentRef, {
+            likes: newLikers.length,
+            dislikes: newDislikers.length,
+            likers: newLikers,
+            dislikers: newDislikers
+        });
+    };
+
+    const handleEditProfile = async (e) => {
+        e.preventDefault();
+        if (!user) return;
+
+        const newDisplayName = editDisplayNameInput.value.trim();
+        const newUsername = editUsernameInput.value.trim().toLowerCase();
+        const newBio = editBioInput.value.trim();
+
+        if (newDisplayName === user.displayName && newUsername === user.username && newBio === user.bio) {
+            showModal('No changes were made.');
+            return;
+        }
+
+        if (newUsername && newUsername !== user.username) {
+            // Check for username uniqueness
+            const existingUser = await getUserDataFromUsername(newUsername);
+            if (existingUser && existingUser.uid !== user.uid) {
+                showModal('This username is already taken. Please choose another one.');
+                return;
+            }
+        }
+
+        const updates = {
+            displayName: newDisplayName,
+            bio: newBio
+        };
+        if (newUsername && newUsername !== user.username) {
+            updates.username = newUsername;
+        }
+
+        try {
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+            await updateDoc(userDocRef, updates);
+            showModal('Profile updated successfully!');
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            showModal(`Failed to update profile: ${error.message}`);
+        }
     };
 
     const handleUsernameSubmit = async (e) => {
         e.preventDefault();
-        const newUsername = usernameInput.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
-        
-        if (!newUsername) {
-            showModal('Username cannot be empty.');
+        const newUsername = usernameInput.value.trim().toLowerCase();
+        if (newUsername.length < 3) {
+            showModal('Username must be at least 3 characters long.');
             return;
         }
-
-        const usernameQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where("username", "==", newUsername));
-        const usernameSnapshot = await getDocs(usernameQuery);
         
-        if (!usernameSnapshot.empty) {
-            showModal('This username is already taken. Please choose another.');
+        if (!/^[a-z0-9_.]+$/.test(newUsername)) {
+            showModal('Username can only contain lowercase letters, numbers, underscores, and periods.');
             return;
         }
-
-        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
-        await updateDoc(userRef, {
-            username: newUsername,
-            lastUsernameChange: serverTimestamp()
-        });
         
-        user.username = newUsername;
-        await updateAllPostsAndComments(user.uid, null, user.username, undefined);
-        
-        showModal('Username saved successfully!');
-        navigateToHome();
-    };
-    
-    const handleProfilePicChange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const originalBtnHtml = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>`;
-        showLoadingIndicator(profilePicLabelEl, 'Uploading...');
-        
-        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
-        const userSnap = await getDoc(userRef);
-        const userData = userSnap.data();
-
-        let oldPhotoURL = userData.photoURL;
-        
-        const filePath = `${user.uid}/profile_pics/${Date.now()}-${file.name}`;
-        const photoURL = await uploadFile('profiles', filePath, file);
-        
-        if (photoURL) {
-            await updateDoc(userRef, { photoURL });
-            user.photoURL = photoURL;
-            profilePicDisplayEl.src = photoURL;
-            await updateAllPostsAndComments(user.uid, null, null, user.photoURL);
-            
-            // Delete old profile picture if it exists and is from Supabase
-            if (oldPhotoURL && oldPhotoURL.includes(SUPABASE_URL)) {
-                const oldPath = getPathFromSupabaseUrl(oldPhotoURL, 'profiles');
-                await deleteFile('profiles', oldPath);
-            }
-
-            showModal('Profile picture updated successfully!');
-        }
-        
-        hideLoadingIndicator(profilePicLabelEl, originalBtnHtml);
-    };
-
-    const handleEditProfile = () => {
-        editProfileFormContainerEl.classList.remove('hidden');
-        profileContentEl.querySelector('.bg-white').classList.add('hidden');
-        editDisplayNameInput.value = user.displayName || '';
-        editUsernameInput.value = user.username || '';
-        editBioInput.value = user.bio || '';
-    };
-
-    const handleEditProfileSubmit = async (e) => {
-        e.preventDefault();
-        const newDisplayName = editDisplayNameInput.value.trim().substring(0, 25);
-        const newUsername = editUsernameInput.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
-        const newBio = editBioInput.value.trim();
-
-        if (!newDisplayName || !newUsername) {
-            showModal('Display Name and Username are required.');
-            return;
-        }
-
-        const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
-        const userSnap = await getDoc(userRef);
-        const userData = userSnap.data();
-        let usernameChanged = false;
-
-        if (newUsername !== userData.username) {
-            const now = new Date();
-            const lastChange = userData.lastUsernameChange?.toDate() || new Date(0);
-            const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-            if (now.getTime() - lastChange.getTime() < sevenDaysInMs) {
-                showModal('You can only change your username once every 7 days.');
+        try {
+            const existingUser = await getUserDataFromUsername(newUsername);
+            if (existingUser) {
+                showModal('This username is already taken. Please choose another one.');
                 return;
             }
 
-            const usernameQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/users`), where("username", "==", newUsername));
-            const usernameSnapshot = await getDocs(usernameQuery);
-            if (!usernameSnapshot.empty && usernameSnapshot.docs[0].id !== user.uid) {
-                showModal('This username is already taken. Please choose another.');
-                return;
-            }
-            usernameChanged = true;
-        }
-        
-        const updateData = { displayName: newDisplayName, bio: newBio };
-        if (usernameChanged) {
-            updateData.username = newUsername;
-            updateData.lastUsernameChange = serverTimestamp();
-        }
-
-        await updateDoc(userRef, updateData);
-        
-        user.displayName = newDisplayName;
-        user.username = newUsername;
-        user.bio = newBio;
-        
-        await updateAllPostsAndComments(user.uid, newDisplayName, newUsername, undefined);
-        
-        showModal('Profile updated successfully!');
-        navigateToProfile(newUsername);
-    };
-
-    // --- Post & Comment Handlers ---
-    const handlePostSubmit = async (e) => {
-        e.preventDefault();
-        if (!user || user.isBanned) {
-            showModal('You are not authorized to create posts.');
-            return;
-        }
-        if (!postContentInputEl.value.trim() && postMediaFiles.length === 0) {
-            showModal('Please write something to post or attach media.');
-            return;
-        }
-        
-        const originalBtnText = postSubmitBtn.innerHTML;
-        showLoadingIndicator(postSubmitBtn, 'Uploading...');
-
-        let mediaUrls = [];
-        let mediaUrl = null;
-
-        if (postMediaFiles.length > 0) {
-            if (postMediaFiles[0].type.startsWith('video')) {
-                const mediaPath = `${user.uid}/posts/${Date.now()}-${postMediaFiles[0].name}`;
-                mediaUrl = await uploadFile('media', mediaPath, postMediaFiles[0]);
-                if (!mediaUrl) {
-                    hideLoadingIndicator(postSubmitBtn, originalBtnText);
-                    return;
-                }
-            } else {
-                const uploadPromises = postMediaFiles.map(async (file, index) => {
-                    const mediaPath = `${user.uid}/posts/${Date.now()}-${index}-${file.name}`;
-                    return await uploadFile('media', mediaPath, file);
-                });
-                mediaUrls = await Promise.all(uploadPromises);
-                if (mediaUrls.some(url => !url)) {
-                    hideLoadingIndicator(postSubmitBtn, originalBtnText);
-                    return;
-                }
-            }
-        }
-        
-        const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
-        await addDoc(postsRef, {
-            userId: user.uid,
-            authorDisplayName: user.displayName || 'Anonymous',
-            authorUsername: user.username || 'unknown',
-            authorPhotoURL: user.photoURL || null,
-            content: postContentInputEl.value.trim(),
-            mediaUrl: mediaUrl,
-            mediaUrls: mediaUrls.length > 0 ? mediaUrls : null,
-            createdAt: serverTimestamp(),
-            likes: 0,
-            dislikes: 0,
-            likers: [],
-            dislikers: [],
-        });
-        hidePostForm();
-        hideLoadingIndicator(postSubmitBtn, originalBtnText);
-    };
-    
-    const handlePostMediaChange = async () => {
-        const files = postMediaInputEl.files;
-        postMediaFiles = [];
-        mediaPreviewsEl.innerHTML = '';
-        if (!files || files.length === 0) {
-            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0;
-            return;
-        }
-
-        const isVideoAttached = Array.from(files).some(file => file.type.startsWith('video'));
-        if (isVideoAttached) {
-            const videoFile = Array.from(files).find(file => file.type.startsWith('video'));
-            postMediaFiles.push(videoFile);
-            const imgUrl = URL.createObjectURL(videoFile);
-            mediaPreviewsEl.innerHTML = `
-                <div class="relative group">
-                    <video src="${imgUrl}" class="w-24 h-24 object-cover rounded-md"></video>
-                    <button type="button" class="absolute top-1 right-1 p-1 bg-gray-800 bg-opacity-70 text-white rounded-full text-xs hover:bg-opacity-100 remove-media-btn" data-index="0">&times;</button>
-                </div>
-            `;
-        } else {
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                if (file.type.startsWith('image')) {
-                    try {
-                        const resizedBlob = await resizeImage(file);
-                        postMediaFiles.push(resizedBlob);
-                        const previewContainer = document.createElement('div');
-                        previewContainer.className = 'relative group';
-                        const imgUrl = URL.createObjectURL(resizedBlob);
-                        previewContainer.innerHTML = `
-                            <img src="${imgUrl}" class="w-24 h-24 object-cover rounded-md" alt="Preview">
-                            <button type="button" class="absolute top-1 right-1 p-1 bg-gray-800 bg-opacity-70 text-white rounded-full text-xs hover:bg-opacity-100 remove-media-btn" data-index="${postMediaFiles.length - 1}">&times;</button>
-                        `;
-                        mediaPreviewsEl.appendChild(previewContainer);
-                    } catch (err) {
-                        console.error("Image resizing failed:", err);
-                    }
-                }
-            }
-        }
-        postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && postMediaFiles.length === 0;
-    };
-
-    const handlePostContentChange = () => {
-        postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && postMediaFiles.length === 0;
-    };
-    
-    const handleCommentContentChange = (e) => {
-        const form = e.target.closest('form');
-        if (!form) return;
-        const submitBtn = form.querySelector('.comment-submit-btn, .reply-submit-btn');
-        const content = form.querySelector('input[name="comment-content"]').value.trim();
-        const postId = form.getAttribute('data-post-id');
-        const parentCommentId = form.getAttribute('data-parent-comment-id');
-        const key = parentCommentId ? `${postId}-${parentCommentId}` : postId;
-        const mediaFile = commentMediaFiles.get(key);
-        submitBtn.disabled = content.length === 0 && !mediaFile;
-    };
-
-    const handleCommentMediaChange = (e) => {
-        const file = e.target.files[0];
-        const form = e.target.closest('form');
-        const postId = form.getAttribute('data-post-id');
-        const parentCommentId = form.getAttribute('data-parent-comment-id');
-        const key = parentCommentId ? `${postId}-${parentCommentId}` : postId;
-        const filenameEl = form.querySelector('span[id^="comment-media-filename-"], span[id^="reply-media-filename-"]');
-        
-        if (file) {
-            commentMediaFiles.set(key, file);
-            if (filenameEl) filenameEl.textContent = file.name;
-        } else {
-            commentMediaFiles.delete(key);
-            if (filenameEl) filenameEl.textContent = '';
-        }
-
-        const submitBtn = form.querySelector('.comment-submit-btn, .reply-submit-btn');
-        const content = form.querySelector('input[name="comment-content"]').value.trim();
-        submitBtn.disabled = content.length === 0 && !file;
-    };
-
-    const handlePostDelete = async (postId) => {
-        if (!user || user.isBanned) {
-            showModal('You are not authorized to perform this action.');
-            return;
-        }
-        
-        currentPostIdToDelete = postId;
-        
-        showConfirmationModal('Are you sure you want to delete this post? This action cannot be undone.', async () => {
-            if (!currentPostIdToDelete) return;
-            const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, currentPostIdToDelete);
-            const postSnap = await getDoc(postRef);
-            if (postSnap.exists() && postSnap.data().userId === user.uid) {
-                const postData = postSnap.data();
-                if (postData.mediaUrl) {
-                    const mediaPath = getPathFromSupabaseUrl(postData.mediaUrl, 'media');
-                    await deleteFile('media', mediaPath);
-                }
-                if (postData.mediaUrls && postData.mediaUrls.length > 0) {
-                    const deletePromises = postData.mediaUrls.map(url => {
-                        const mediaPath = getPathFromSupabaseUrl(url, 'media');
-                        return deleteFile('media', mediaPath);
-                    });
-                    await Promise.all(deletePromises);
-                }
-                await deleteDoc(postRef);
-                showModal('Post deleted successfully!');
-            } else {
-                showModal('You are not authorized to delete this post.');
-            }
-            confirmationModalEl.classList.add('hidden');
-        });
-    };
-
-    const handleCommentSubmit = async (e) => {
-        e.preventDefault();
-        if (!user || user.isBanned) {
-            showModal('You are not authorized to comment.');
-            return;
-        }
-
-        const postId = e.target.getAttribute('data-post-id');
-        const parentCommentId = e.target.getAttribute('data-parent-comment-id');
-        const contentInput = e.target.querySelector('input[name="comment-content"]');
-        const content = contentInput.value.trim();
-        const key = parentCommentId ? `${postId}-${parentCommentId}` : postId;
-        const mediaFile = commentMediaFiles.get(key);
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const originalBtnText = submitBtn.innerHTML;
-
-        if (!content && !mediaFile) {
-            showModal('Please write a comment or add media.');
-            return;
-        }
-        
-        showLoadingIndicator(submitBtn, 'Uploading...');
-
-        let mediaUrl = null;
-        if (mediaFile) {
-            const mediaPath = `${user.uid}/comments/${Date.now()}-${mediaFile.name}`;
-            mediaUrl = await uploadFile('media', mediaPath, mediaFile);
-            if (!mediaUrl) {
-                hideLoadingIndicator(submitBtn, originalBtnText);
-                return;
-            }
-        }
-
-        const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`);
-        await addDoc(commentsRef, {
-            userId: user.uid,
-            authorDisplayName: user.displayName || 'Anonymous',
-            authorUsername: user.username || 'unknown',
-            authorPhotoURL: user.photoURL || null,
-            content,
-            mediaUrl: mediaUrl,
-            createdAt: serverTimestamp(),
-            likes: 0,
-            dislikes: 0,
-            likers: [],
-            dislikers: [],
-            parentCommentId,
-        });
-        e.target.reset();
-        commentMediaFiles.delete(key);
-        hideLoadingIndicator(submitBtn, originalBtnText);
-        submitBtn.disabled = true;
-        const filenameEl = e.target.querySelector('span[id^="comment-media-filename-"], span[id^="reply-media-filename-"]');
-        if (filenameEl) {
-            filenameEl.textContent = '';
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+            await updateDoc(userDocRef, { username: newUsername });
+            user.username = newUsername; // Update local state immediately
+            renderUI();
+        } catch (error) {
+            console.error("Error setting username:", error);
+            showModal(`Failed to set username: ${error.message}`);
         }
     };
 
-    const handleCommentDelete = async (postId, commentId) => {
-        if (!user || user.isBanned) {
-            showModal('You are not authorized to perform this action.');
-            return;
-        }
-        showConfirmationModal('Are you sure you want to delete this comment? This action cannot be undone.', async () => {
-            const commentRef = doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, commentId);
-            const commentSnap = await getDoc(commentRef);
-            if (commentSnap.exists() && commentSnap.data().userId === user.uid) {
-                const commentData = commentSnap.data();
-                if (commentData.mediaUrl) {
-                     const mediaPath = getPathFromSupabaseUrl(commentData.mediaUrl, 'media');
-                     await deleteFile('media', mediaPath);
-                }
-                await deleteDoc(commentRef);
-                showModal('Comment deleted successfully!');
-            } else {
-                showModal('You are not authorized to delete this comment.');
-            }
-            confirmationModalEl.classList.add('hidden');
-        });
-    };
-
-    // --- Like/Dislike Handlers ---
-    const handleVote = async (target, targetId, voteType, postId = null) => {
-        if (!user || user.isBanned) {
-            showModal('You must be signed in to like or dislike.');
-            return;
-        }
-
-        const ref = target === 'post'
-            ? doc(db, `/artifacts/${APP_ID}/public/data/posts`, targetId)
-            : doc(db, `/artifacts/${APP_ID}/public/data/posts/${postId}/comments`, targetId);
-
-        const docSnapshot = await getDoc(ref);
-
-        if (!docSnapshot.exists()) {
-            showModal('Error: Document not found.');
-            return;
-        }
-
-        const data = docSnapshot.data();
-        let likers = data.likers || [];
-        let dislikers = data.dislikers || [];
-        let likesCount = data.likes;
-        let dislikesCount = data.dislikes;
-
-        const userId = user.uid;
-        const hasLiked = likers.includes(userId);
-        const hasDisliked = dislikers.includes(userId);
-
-        if (voteType === 'like') {
-            if (hasLiked) {
-                likers = likers.filter(id => id !== userId);
-                likesCount--;
-            } else {
-                likers = [...likers, userId];
-                likesCount++;
-                if (hasDisliked) {
-                    dislikers = dislikers.filter(id => id !== userId);
-                    dislikesCount--;
-                }
-            }
-        } else { // voteType === 'dislike'
-            if (hasDisliked) {
-                dislikers = dislikers.filter(id => id !== userId);
-                dislikesCount--;
-            } else {
-                dislikers = [...dislikers, userId];
-                dislikesCount++;
-                if (hasLiked) {
-                    likers = likers.filter(id => id !== userId);
-                    likesCount--;
-                }
-            }
-        }
-        await updateDoc(ref, {
-            likes: likesCount,
-            dislikes: dislikesCount,
-            likers: likers,
-            dislikers: dislikers,
-        });
-    };
-
-    // --- Firestore Listeners with Share Logic ---
-    const unsubscribeAll = () => {
-        if (postUnsubscribe) {
-            postUnsubscribe();
-            postUnsubscribe = null;
-        }
-        if (profilePostsUnsubscribe) {
-            profilePostsUnsubscribe();
-            profilePostsUnsubscribe = null;
-        }
-        for (const postId in commentUnsubscribes) {
-            if (commentUnsubscribes[postId]) {
-                commentUnsubscribes[postId]();
-            }
-        }
-        commentUnsubscribes = {};
-    };
-
+    // --- Firestore Listeners ---
     const setupFirestoreListeners = () => {
-        unsubscribeAll();
-        
-        if (user && !user.username) {
-            return;
-        }
-        
-        const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
-        getDocs(usersRef).then(allUsersSnapshot => {
-            usersMap = new Map(allUsersSnapshot.docs.map(doc => [doc.id, doc.data()]));
-        });
+        if (postUnsubscribe) postUnsubscribe();
+        if (profilePostsUnsubscribe) profilePostsUnsubscribe();
+        Object.values(commentUnsubscribes).forEach(unsub => unsub());
+        commentUnsubscribes = {};
+
+        const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
 
         if (viewingProfileUsername) {
-            const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
-            const userQuery = query(usersRef, where("username", "==", viewingProfileUsername));
-            getDocs(userQuery).then(userSnapshot => {
-                if (!userSnapshot.empty) {
-                    const profileUserId = userSnapshot.docs[0].id;
-                    const profileUserData = userSnapshot.docs[0].data();
-
-                    if (profileUserData.isBanned) {
-                        profilePostsContainerEl.innerHTML = `<p class="text-center text-red-500 mt-10 text-xl font-bold">This account is banned.</p>`;
-                        return;
-                    }
-                    
-                    const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
-                    const postsQuery = query(postsRef, where("userId", "==", profileUserId));
-                    profilePostsUnsubscribe = onSnapshot(postsQuery, async (postsSnapshot) => {
-                        let profilePosts = postsSnapshot.docs.map(doc => {
-                           const postData = doc.data();
-                           const userData = usersMap.get(postData.userId);
-                           return { id: doc.id, ...postData, comments: [], isBanned: userData?.isBanned || false };
-                        });
-                        profilePosts = profilePosts.filter(p => !p.isBanned);
-                        profilePosts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
-
-                        for (const post of profilePosts) {
-                            const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
-                            const commentSnapshot = await getDocs(commentsRef);
-                            const commentsData = commentSnapshot.docs.map(commentDoc => {
-                                const commentData = commentDoc.data();
-                                const userData = usersMap.get(commentData.userId);
-                                return { id: commentDoc.id, ...commentData, isBanned: userData?.isBanned || false };
-                            });
-                            const sortedComments = commentsData.filter(c => !c.parentCommentId && !c.isBanned).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                            sortedComments.forEach(comment => {
-                                comment.replies = commentsData.filter(c => c.parentCommentId === comment.id && !c.isBanned).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                            });
-                            post.comments = sortedComments;
-                        }
-                        renderPosts(profilePosts, profilePostsContainerEl);
+            (async () => {
+                const profileUser = await getUserDataFromUsername(viewingProfileUsername);
+                if (profileUser) {
+                    const q = query(postsRef, where("userId", "==", profileUser.uid));
+                    profilePostsUnsubscribe = onSnapshot(q, (snapshot) => {
+                        posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        renderPosts(posts, profilePostsContainerEl);
+                        setupCommentListenersForPosts(posts);
                     });
-                } else {
-                    renderPosts([], profilePostsContainerEl);
                 }
-            }).catch(error => {
-                console.error("Error fetching profile user data:", error);
-            });
-            
-        } else if (sharedPostId) {
-            const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, sharedPostId);
-            postUnsubscribe = onSnapshot(postRef, async (postSnapshot) => {
-                if (postSnapshot.exists()) {
-                    const postData = { id: postSnapshot.id, ...postSnapshot.data(), comments: [] };
-                    const postAuthorData = usersMap.get(postData.userId);
-                    
-                    if (postAuthorData?.isBanned) {
-                        postsContainerEl.innerHTML = `<p class="text-center text-red-500 mt-10 text-xl font-bold">This post is no longer available.</p>`;
-                        return;
-                    }
-
-                    const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${postData.id}/comments`);
-                    commentUnsubscribes[postData.id] = onSnapshot(commentsRef, (commentSnapshot) => {
-                        const commentsData = commentSnapshot.docs.map(commentDoc => {
-                            const commentData = commentDoc.data();
-                            const userData = usersMap.get(commentData.userId);
-                            return { id: commentDoc.id, ...commentData, isBanned: userData?.isBanned || false };
-                        });
-                        
-                        const sortedComments = commentsData.filter(c => !c.parentCommentId && !c.isBanned).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                        sortedComments.forEach(comment => {
-                            comment.replies = commentsData.filter(c => c.parentCommentId === comment.id && !c.isBanned).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                        });
-                        
-                        postData.comments = sortedComments;
-                        posts = [postData];
-                        renderPosts(posts, postsContainerEl);
-                    });
-                } else {
-                    postsContainerEl.innerHTML = `<p class="text-center text-red-500 mt-10">Post not found.</p>`;
-                }
-            });
+            })();
         } else {
-            const postsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
-            postUnsubscribe = onSnapshot(query(postsRef), async (snapshot) => {
-                const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            postUnsubscribe = onSnapshot(postsRef, (snapshot) => {
+                posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                posts.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
                 
-                const postsWithUserData = fetchedPosts.map(post => {
-                    const userData = usersMap.get(post.userId);
-                    return {
-                        ...post,
-                        authorPhotoURL: userData?.photoURL || null,
-                        isBanned: userData?.isBanned || false,
-                        authorDisplayName: userData?.displayName || post.authorDisplayName,
-                        authorUsername: userData?.username || post.authorUsername
-                    };
-                });
-
-                posts = postsWithUserData.filter(post => !post.isBanned);
-                posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
-
-                for (const postId in commentUnsubscribes) {
-                    if (commentUnsubscribes[postId]) {
-                        commentUnsubscribes[postId]();
-                    }
+                if (sharedPostId) {
+                    const sharedPost = posts.find(p => p.id === sharedPostId);
+                    posts = sharedPost ? [sharedPost] : [];
                 }
-                commentUnsubscribes = {};
 
-                posts.forEach(post => {
-                    const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
-                    commentUnsubscribes[post.id] = onSnapshot(commentsRef, (commentSnapshot) => {
-                        const fetchedComments = commentSnapshot.docs.map(commentDoc => {
-                           const commentData = commentDoc.data();
-                           const userData = usersMap.get(commentData.userId);
-                           return { id: commentDoc.id, ...commentData, isBanned: userData?.isBanned || false };
-                        });
-                        
-                        const commentsWithUserData = fetchedComments.filter(comment => !comment.isBanned).map(comment => {
-                            return {
-                                ...comment,
-                                authorPhotoURL: usersMap.get(comment.userId)?.photoURL || null,
-                                authorDisplayName: usersMap.get(comment.userId)?.displayName || comment.authorDisplayName,
-                                authorUsername: usersMap.get(comment.userId)?.username || comment.authorUsername
-                            };
-                        });
-
-                        const sortedComments = commentsWithUserData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                        sortedComments.forEach(comment => {
-                            comment.replies = commentsWithUserData.filter(c => c.parentCommentId === comment.id).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
-                        });
-
-                        const postIndex = posts.findIndex(p => p.id === post.id);
-                        if (postIndex !== -1) {
-                            posts[postIndex].comments = sortedComments;
-                        }
-                        renderPosts(posts, postsContainerEl);
-                    });
-                });
-                renderPosts(posts, postsContainerEl);
+                renderUI(); // This will call renderHomePage which then calls renderPosts
+                setupCommentListenersForPosts(posts);
             });
         }
     };
 
-    // --- Event Listeners and Initial Setup ---
+    const setupCommentListenersForPosts = (postList) => {
+        // Clear old listeners
+        Object.values(commentUnsubscribes).forEach(unsub => unsub());
+        commentUnsubscribes = {};
+
+        postList.forEach(post => {
+            const commentsRef = collection(db, `/artifacts/${APP_ID}/public/data/posts/${post.id}/comments`);
+            const q = query(commentsRef);
+            commentUnsubscribes[post.id] = onSnapshot(q, (snapshot) => {
+                const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                comments.sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+                
+                // Nest replies under their parent comments
+                const nestedComments = [];
+                const commentMap = new Map();
+                comments.forEach(comment => {
+                    comment.replies = [];
+                    commentMap.set(comment.id, comment);
+                });
+
+                comments.forEach(comment => {
+                    if (comment.parentCommentId && commentMap.has(comment.parentCommentId)) {
+                        commentMap.get(comment.parentCommentId).replies.push(comment);
+                    } else {
+                        nestedComments.push(comment);
+                    }
+                });
+
+                const updatedPost = posts.find(p => p.id === post.id);
+                if (updatedPost) {
+                    updatedPost.comments = nestedComments;
+                    updatedPost.commentsCount = comments.length;
+                    renderPosts(posts, viewingProfileUsername ? profilePostsContainerEl : postsContainerEl);
+                }
+            });
+        });
+    };
+
+    // --- Main Initializer ---
     window.onload = () => {
         handleShareLinkAndProfile();
+
         modalOkBtn.onclick = closeModal;
-        postFormEl.onsubmit = handlePostSubmit;
-        postMediaInputEl.onchange = handlePostMediaChange;
-        postContentInputEl.oninput = handlePostContentChange;
-        closePostFormBtn.onclick = hidePostForm;
-        usernameFormEl.onsubmit = handleUsernameSubmit;
-        editProfileFormEl.onsubmit = handleEditProfileSubmit;
-        editProfileBtn.onclick = handleEditProfile;
-        profilePicInputEl.onchange = handleProfilePicChange;
         navHomeBtn.onclick = navigateToHome;
         navPostBtn.onclick = showPostForm;
-        navProfileBtn.onclick = () => {
-            if (user && user.username) {
-                navigateToProfile(user.username);
-            }
+        navProfileBtn.onclick = () => user ? navigateToProfile(user.username) : showModal('Please sign in to view your profile.');
+        closePostFormBtn.onclick = hidePostForm;
+        postFormEl.onsubmit = handlePostSubmit;
+        editProfileFormEl.onsubmit = handleEditProfile;
+        usernameFormEl.onsubmit = handleUsernameSubmit;
+
+        postContentInputEl.oninput = () => {
+            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && !postMediaFile;
         };
-        
-        document.addEventListener('input', (e) => {
-            const form = e.target.closest('form');
-            if (form && (form.classList.contains('comment-form') || form.classList.contains('comment-reply-form'))) {
-                handleCommentContentChange(e);
-            }
-        });
+
+        postMediaInputEl.onchange = (e) => {
+            postMediaFile = e.target.files[0];
+            postMediaFilenameEl.textContent = postMediaFile ? postMediaFile.name : '';
+            postSubmitBtn.disabled = postContentInputEl.value.trim().length === 0 && !postMediaFile;
+        };
 
         document.addEventListener('change', (e) => {
-            const form = e.target.closest('form');
-            if (form && (e.target.id.startsWith('comment-media-input-') || e.target.id.startsWith('reply-media-input-'))) {
-                handleCommentMediaChange(e);
+            if (e.target.matches('input[id^="comment-media-input-"], input[id^="reply-media-input-"]')) {
+                const file = e.target.files[0];
+                const postId = e.target.dataset.postId;
+                const commentId = e.target.dataset.commentId;
+                const filenameId = `comment-media-filename-${postId}` || `reply-media-filename-${commentId}`;
+                const filenameEl = document.getElementById(filenameId);
+                if (file) {
+                    commentMediaFiles.set(commentId || postId, file);
+                    if (filenameEl) filenameEl.textContent = file.name;
+                } else {
+                    commentMediaFiles.delete(commentId || postId);
+                    if (filenameEl) filenameEl.textContent = '';
+                }
             }
         });
 
-        document.addEventListener('click', async (e) => {
-            const target = e.target.closest('button, a');
-            if (!target) return;
-
-            const postId = target.getAttribute('data-post-id');
-            const commentId = target.getAttribute('data-comment-id');
-
-            if (target.id === 'go-home-link') {
-                e.preventDefault();
-                navigateToHome();
-            } else if (target.classList.contains('delete-post-btn')) {
-                await handlePostDelete(postId);
-            } else if (target.classList.contains('delete-comment-btn')) {
-                await handleCommentDelete(postId, commentId);
-            } else if (target.classList.contains('like-post-btn')) {
-                await handleVote('post', postId, 'like');
-            } else if (target.classList.contains('dislike-post-btn')) {
-                await handleVote('post', postId, 'dislike');
-            } else if (target.classList.contains('like-comment-btn')) {
-                await handleVote('comment', commentId, 'like', postId);
-            } else if (target.classList.contains('dislike-comment-btn')) {
-                await handleVote('comment', commentId, 'dislike', postId);
-            } else if (target.classList.contains('share-post-btn')) {
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.delete-post-btn')) {
+                const postId = e.target.dataset.postId;
+                if (postId) handleDeletePost(postId);
+            }
+            if (e.target.matches('.delete-comment-btn')) {
+                const postId = e.target.dataset.postId;
+                const commentId = e.target.dataset.commentId;
+                if (postId && commentId) handleDeleteComment(postId, commentId);
+            }
+            if (e.target.matches('.post-options-btn')) {
+                e.stopPropagation();
+                const menu = e.target.nextElementSibling;
+                if (menu) menu.classList.toggle('hidden');
+            }
+            if (e.target.matches('.like-post-btn')) {
+                const postId = e.target.dataset.postId;
+                handleLikePost(postId);
+            }
+            if (e.target.matches('.dislike-post-btn')) {
+                const postId = e.target.dataset.postId;
+                handleDislikePost(postId);
+            }
+            if (e.target.matches('.like-comment-btn')) {
+                const postId = e.target.dataset.postId;
+                const commentId = e.target.dataset.commentId;
+                handleLikeComment(postId, commentId);
+            }
+            if (e.target.matches('.dislike-comment-btn')) {
+                const postId = e.target.dataset.postId;
+                const commentId = e.target.dataset.commentId;
+                handleDislikeComment(postId, commentId);
+            }
+            if (e.target.matches('.share-post-btn')) {
+                const postId = e.target.dataset.postId;
                 copyShareLink(postId);
-            } else if (target.classList.contains('remove-media-btn')) {
-                const indexToRemove = parseInt(target.getAttribute('data-index'));
-                if (indexToRemove >= 0 && indexToRemove < postMediaFiles.length) {
-                    postMediaFiles.splice(indexToRemove, 1);
-                    await handlePostMediaChange();
+            }
+            if (e.target.matches('.comment-toggle-btn')) {
+                const postId = e.target.dataset.postId;
+                const commentsContainer = document.getElementById(`comments-${postId}`);
+                if (commentsContainer) {
+                    commentsContainer.classList.toggle('active');
                 }
             }
         });
 
         document.addEventListener('submit', async (e) => {
-            const form = e.target.closest('form');
-            if (form && (form.classList.contains('comment-form') || form.classList.contains('comment-reply-form'))) {
-                e.preventDefault();
+            if (e.target.matches('.comment-form')) {
                 await handleCommentSubmit(e);
             }
         });
+        
+        editProfileBtn.onclick = () => {
+            editProfileFormContainerEl.classList.toggle('hidden');
+            profileDisplayNameEl.textContent = user.displayName || '';
+            editUsernameInput.value = user.username || '';
+            editBioInput.value = user.bio || '';
+        };
 
         onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
