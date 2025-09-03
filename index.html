@@ -180,7 +180,7 @@
  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setDoc, getDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.2/+esm';
     
@@ -624,10 +624,40 @@
     };
     
     // --- Profile Handlers ---
+    const updateAllPostsAndComments = async (uid, newDisplayName, newUsername, newPhotoURL) => {
+        const batch = writeBatch(db);
+
+        // Update posts
+        const postsQuery = query(collection(db, `/artifacts/${APP_ID}/public/data/posts`), where("userId", "==", uid));
+        const postsSnapshot = await getDocs(postsQuery);
+        postsSnapshot.forEach(docSnap => {
+            const postRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, docSnap.id);
+            const updateData = {};
+            if (newDisplayName) updateData.authorDisplayName = newDisplayName;
+            if (newUsername) updateData.authorUsername = newUsername;
+            if (newPhotoURL) updateData.authorPhotoURL = newPhotoURL;
+            batch.update(postRef, updateData);
+        });
+        
+        // Update comments
+        const commentsQuery = query(collectionGroup(db, 'comments'), where("userId", "==", uid));
+        const commentsSnapshot = await getDocs(commentsQuery);
+        commentsSnapshot.forEach(docSnap => {
+            const commentRef = doc(db, docSnap.ref.path);
+            const updateData = {};
+            if (newDisplayName) updateData.authorDisplayName = newDisplayName;
+            if (newUsername) updateData.authorUsername = newUsername;
+            if (newPhotoURL) updateData.authorPhotoURL = newPhotoURL;
+            batch.update(commentRef, updateData);
+        });
+        
+        await batch.commit();
+    };
+
     const handleUsernameSubmit = async (e) => {
         e.preventDefault();
         const newUsername = usernameInput.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
-
+        
         if (!newUsername) {
             showModal('Username cannot be empty.');
             return;
@@ -648,6 +678,8 @@
         });
         
         user.username = newUsername;
+        await updateAllPostsAndComments(user.uid, null, user.username, null);
+        
         showModal('Username saved successfully!');
         navigateToHome();
     };
@@ -664,6 +696,7 @@
             await updateDoc(userRef, { photoURL });
             user.photoURL = photoURL;
             profilePicDisplayEl.src = photoURL;
+            await updateAllPostsAndComments(user.uid, null, null, user.photoURL);
             showModal('Profile picture updated successfully!');
         }
     };
@@ -690,6 +723,7 @@
         const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
         const userSnap = await getDoc(userRef);
         const userData = userSnap.data();
+        let usernameChanged = false;
 
         if (newUsername !== userData.username) {
             const now = new Date();
@@ -706,20 +740,23 @@
                 showModal('This username is already taken. Please choose another.');
                 return;
             }
-            await updateDoc(userRef, {
-                username: newUsername,
-                lastUsernameChange: serverTimestamp(),
-            });
+            usernameChanged = true;
         }
         
-        await updateDoc(userRef, {
-            displayName: newDisplayName,
-            bio: newBio
-        });
+        const updateData = { displayName: newDisplayName, bio: newBio };
+        if (usernameChanged) {
+            updateData.username = newUsername;
+            updateData.lastUsernameChange = serverTimestamp();
+        }
+
+        await updateDoc(userRef, updateData);
         
         user.displayName = newDisplayName;
         user.username = newUsername;
         user.bio = newBio;
+        
+        await updateAllPostsAndComments(user.uid, newDisplayName, newUsername, null);
+        
         showModal('Profile updated successfully!');
         navigateToProfile(newUsername);
     };
@@ -975,16 +1012,20 @@
                 const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 // Fetch user data for each post to check for banned status
-                const postsWithUserData = await Promise.all(fetchedPosts.map(async post => {
-                    const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, post.userId);
-                    const userSnap = await getDoc(userRef);
-                    const userData = userSnap.exists() ? userSnap.data() : {};
+                const usersRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
+                const allUsersSnapshot = await getDocs(usersRef);
+                const usersMap = new Map(allUsersSnapshot.docs.map(doc => [doc.id, doc.data()]));
+
+                const postsWithUserData = fetchedPosts.map(post => {
+                    const userData = usersMap.get(post.userId);
                     return {
                         ...post,
-                        authorPhotoURL: userData.photoURL || null,
-                        isBanned: userData.isBanned || false
+                        authorPhotoURL: userData?.photoURL || null,
+                        isBanned: userData?.isBanned || false,
+                        authorDisplayName: userData?.displayName || post.authorDisplayName,
+                        authorUsername: userData?.username || post.authorUsername
                     };
-                }));
+                });
 
                 posts = postsWithUserData.filter(post => !post.isBanned);
                 posts.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
@@ -1002,16 +1043,15 @@
                     commentUnsubscribes[post.id] = onSnapshot(commentsRef, async (commentSnapshot) => {
                         const fetchedComments = commentSnapshot.docs.map(commentDoc => ({ id: commentDoc.id, ...commentDoc.data() }));
                         
-                        // Fetch user data for each comment to get profile pictures
-                        const commentsWithUserData = await Promise.all(fetchedComments.map(async comment => {
-                             const userRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, comment.userId);
-                             const userSnap = await getDoc(userRef);
-                             const userData = userSnap.exists() ? userSnap.data() : {};
+                        const commentsWithUserData = fetchedComments.map(comment => {
+                             const userData = usersMap.get(comment.userId);
                              return {
                                 ...comment,
-                                authorPhotoURL: userData.photoURL || null
+                                authorPhotoURL: userData?.photoURL || null,
+                                authorDisplayName: userData?.displayName || comment.authorDisplayName,
+                                authorUsername: userData?.username || comment.authorUsername
                              };
-                        }));
+                        });
 
                         const sortedComments = commentsWithUserData.filter(c => !c.parentCommentId).sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
                         sortedComments.forEach(comment => {
